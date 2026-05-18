@@ -1,3 +1,4 @@
+import logging
 import re
 import tempfile
 import urllib.parse
@@ -7,6 +8,12 @@ from pathlib import Path
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebBaseLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from backend.image_captioner import generate_image_caption
+from backend.models import ExtractedImage
+from backend.pdf_images import extract_pdf_images, page_text_map, paper_id_from_title
+
+logger = logging.getLogger(__name__)
 
 _ARXIV_ID_RE = re.compile(r"(\d{4}\.\d{4,5}(?:v\d+)?)")
 
@@ -24,12 +31,83 @@ _md_splitter = RecursiveCharacterTextSplitter.from_language(
 def _stamp_title(docs: list[Document], title: str) -> list[Document]:
     for doc in docs:
         doc.metadata["title"] = title
+        doc.metadata.setdefault("modality", "text")
+        doc.metadata.setdefault("source_type", "pdf_text")
     return docs
 
 
-def load_pdf(file_path: str) -> list[Document]:
-    docs = PyMuPDFLoader(file_path).load()
-    return _stamp_title(_splitter.split_documents(docs), Path(file_path).stem)
+def _image_to_document(extracted: ExtractedImage, caption: str, title: str) -> Document:
+    """Build a LangChain Document for an image-caption chunk."""
+    page = extracted.page_number
+    page_content = f"Figure extracted from page {page}: {caption}"
+    return Document(
+        page_content=page_content,
+        metadata={
+            "title": title,
+            "modality": "image",
+            "page_number": page,
+            "image_path": extracted.image_path,
+            "caption": caption,
+            "source_type": "pdf_figure",
+            "source_pdf": extracted.source_pdf,
+            "paper_id": extracted.paper_id,
+            "image_index": extracted.image_index,
+        },
+    )
+
+
+def _require_existing_pdf(file_path: str) -> str:
+    """Resolve to an absolute path and verify the PDF exists on disk."""
+    resolved = Path(file_path).expanduser().resolve()
+    if not resolved.is_file():
+        raise FileNotFoundError(f"PDF path does not exist: {resolved}")
+    if resolved.stat().st_size == 0:
+        raise ValueError(f"PDF file is empty: {resolved}")
+    return str(resolved)
+
+
+def _load_pdf_image_chunks(pdf_path: str, title: str) -> list[Document]:
+    """Extract PDF figures, caption them, and return retrievable image chunks."""
+    paper_id = paper_id_from_title(title)
+    try:
+        extracted = extract_pdf_images(pdf_path, paper_id)
+    except Exception as exc:
+        logger.error("Image extraction failed for %s: %s", pdf_path, exc)
+        return []
+
+    if not extracted:
+        return []
+
+    try:
+        page_texts = page_text_map(pdf_path)
+    except Exception as exc:
+        logger.warning("Could not load page text for caption context: %s", exc)
+        page_texts = {}
+
+    image_docs: list[Document] = []
+    for img in extracted:
+        try:
+            context = page_texts.get(img.page_number, "")[:800]
+            caption = generate_image_caption(
+                img.image_path,
+                page_number=img.page_number,
+                context_text=context or None,
+            )
+            image_docs.append(_image_to_document(img, caption, title))
+        except Exception as exc:
+            logger.warning("Captioning skipped for %s: %s", img.image_path, exc)
+
+    logger.info("Indexed %d image-caption chunk(s) for %s", len(image_docs), title)
+    return image_docs
+
+
+def load_pdf(file_path: str, paper_title: str | None = None) -> list[Document]:
+    resolved_path = _require_existing_pdf(file_path)
+    title = paper_title or Path(resolved_path).stem
+    raw_docs = PyMuPDFLoader(resolved_path).load()
+    text_docs = _stamp_title(_splitter.split_documents(raw_docs), title)
+    image_docs = _load_pdf_image_chunks(resolved_path, title)
+    return text_docs + image_docs
 
 
 def load_text(file_path: str) -> list[Document]:
@@ -88,11 +166,10 @@ def _load_arxiv_by_id(arxiv_id: str) -> list[Document]:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
             tmp.write(pdf_bytes)
             tmp_path = tmp.name
-        docs = PyMuPDFLoader(tmp_path).load()
-        if not docs:
-            raise ValueError(f"Could not load PDF for ArXiv ID: {arxiv_id}")
-        title = (docs[0].metadata.get("title") or "").strip() or _arxiv_api_lookup(arxiv_id)
-        return _stamp_title(_splitter.split_documents(docs), title)
+        preview = PyMuPDFLoader(tmp_path).load()
+        title = (preview[0].metadata.get("title") or "").strip() if preview else ""
+        title = title or _arxiv_api_lookup(arxiv_id)
+        return load_pdf(tmp_path, paper_title=title)
     finally:
         if tmp_path:
             Path(tmp_path).unlink(missing_ok=True)
@@ -103,13 +180,13 @@ def load_arxiv(query: str) -> list[Document]:
     return _load_arxiv_by_id(arxiv_id)
 
 
-def load_document(source: str) -> list[Document]:
+def load_document(source: str, paper_title: str | None = None) -> list[Document]:
     """Dispatch to the appropriate loader based on URL prefix or file extension."""
     if source.startswith(("http://", "https://")):
         return load_webpage(source)
     ext = Path(source).suffix.lower()
     if ext == ".pdf":
-        return load_pdf(source)
+        return load_pdf(source, paper_title=paper_title)
     if ext == ".txt":
         return load_text(source)
     if ext in (".md", ".markdown"):
