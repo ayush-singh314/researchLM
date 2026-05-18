@@ -24,6 +24,8 @@ from backend.vector_store import search as vs_search
 
 load_dotenv()
 
+RETRIEVAL_STRATEGY = os.environ.get("RETRIEVAL_STRATEGY", "dense").lower().strip()
+
 llm = ChatGroq(model="llama-3.3-70b-versatile")
 
 
@@ -101,7 +103,8 @@ def retrieve_from_vectorstore(
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> list:
     """Search the uploaded research paper vector store for relevant passages."""
-    docs = vs_search(query=query, session_id=session_id, k=k)
+    print(f"[retrieval] strategy={RETRIEVAL_STRATEGY} top_k={k}")
+    docs = vs_search(query=query, session_id=session_id, k=k, strategy=RETRIEVAL_STRATEGY)
     if not docs:
         return [ToolMessage(content="No relevant documents found in the vector store.", tool_call_id=tool_call_id)]
     summary = f"Retrieved {len(docs)} chunk(s) from the vector store."

@@ -1,0 +1,2 @@
+-
+- metric explanation: avg_top_k_hit:  avg. of number of hit( context containing the answer) in the top k    

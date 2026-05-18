@@ -94,19 +94,40 @@ def _load_pdf_image_chunks(pdf_path: str, title: str) -> list[Document]:
                 context_text=context or None,
             )
             image_docs.append(_image_to_document(img, caption, title))
+            logger.info(
+                "Indexed image chunk for %s page %s (%s)",
+                title,
+                img.page_number,
+                img.image_path,
+            )
         except Exception as exc:
-            logger.warning("Captioning skipped for %s: %s", img.image_path, exc)
+            logger.warning(
+                "Caption failed for %s page %s (%s): %s",
+                title,
+                img.page_number,
+                img.image_path,
+                exc,
+            )
 
-    logger.info("Indexed %d image-caption chunk(s) for %s", len(image_docs), title)
+    logger.info(
+        "Image ingestion for %s: %d/%d captioned",
+        title,
+        len(image_docs),
+        len(extracted),
+    )
     return image_docs
 
 
-def load_pdf(file_path: str, paper_title: str | None = None) -> list[Document]:
+def load_pdf(
+    file_path: str,
+    paper_title: str | None = None,
+    include_images: bool = True,
+) -> list[Document]:
     resolved_path = _require_existing_pdf(file_path)
     title = paper_title or Path(resolved_path).stem
     raw_docs = PyMuPDFLoader(resolved_path).load()
     text_docs = _stamp_title(_splitter.split_documents(raw_docs), title)
-    image_docs = _load_pdf_image_chunks(resolved_path, title)
+    image_docs = _load_pdf_image_chunks(resolved_path, title) if include_images else []
     return text_docs + image_docs
 
 
@@ -180,13 +201,17 @@ def load_arxiv(query: str) -> list[Document]:
     return _load_arxiv_by_id(arxiv_id)
 
 
-def load_document(source: str, paper_title: str | None = None) -> list[Document]:
+def load_document(
+    source: str,
+    paper_title: str | None = None,
+    include_images: bool = True,
+) -> list[Document]:
     """Dispatch to the appropriate loader based on URL prefix or file extension."""
     if source.startswith(("http://", "https://")):
         return load_webpage(source)
     ext = Path(source).suffix.lower()
     if ext == ".pdf":
-        return load_pdf(source, paper_title=paper_title)
+        return load_pdf(source, paper_title=paper_title, include_images=include_images)
     if ext == ".txt":
         return load_text(source)
     if ext in (".md", ".markdown"):

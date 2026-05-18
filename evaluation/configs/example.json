@@ -1,0 +1,9 @@
+{
+  "dataset": "openclaw",
+  "strategy": "dense",
+  "modality_mode": "multimodal",
+  "embedding_model": "text-embedding-3-small",
+  "metric_threshold": 0.7,
+  "deepeval_model": "gpt-4o-mini",
+  "top_k": 4
+}

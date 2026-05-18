@@ -1,0 +1,8 @@
+{
+  "dataset_name": "openclaw",
+  "description": "Dense retrieval benchmark for Openclaw paper",
+  "modality": "text",
+  "default_category": "general",
+  "categories": ["general"],
+  "source_files": ["documents/Openclaw_Research_Report.pdf"]
+}

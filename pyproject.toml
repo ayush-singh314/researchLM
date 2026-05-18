@@ -26,6 +26,7 @@ dependencies = [
     "pypdf>=6.10.2",
     "python-dotenv>=1.2.2",
     "qdrant-client>=1.17.1",
+    "rank-bm25>=0.2.2",
     "streamlit>=1.57.0",
     "tavily-python>=0.7.24",
 ]
