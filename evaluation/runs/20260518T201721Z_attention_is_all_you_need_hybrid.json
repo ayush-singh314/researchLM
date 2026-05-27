@@ -1,0 +1,704 @@
+{
+  "run_id": "20260518T201721Z",
+  "timestamp": "2026-05-18T20:25:26.549884+00:00",
+  "dataset": "attention_is_all_you_need",
+  "strategy": "hybrid",
+  "strategy_description": "Reciprocal-rank fusion of BM25 and dense retrieval.",
+  "modality_mode": "multimodal",
+  "embedding_model": "text-embedding-3-small",
+  "metric_threshold": 0.7,
+  "deepeval_model": "gpt-5.4-mini",
+  "top_k": 20,
+  "chunking_profile": "research",
+  "use_rerank": true,
+  "session_id": "eval_attention_is_all_you_need_hybrid_903677e0",
+  "summary": {
+    "num_questions": 10,
+    "pass_rate": 0.0,
+    "avg_contextual_precision": 0.7246503295438018,
+    "avg_contextual_recall": 0.915,
+    "avg_contextual_relevancy": 0.21370851723864673,
+    "avg_answer_relevancy": 0.9375,
+    "avg_faithfulness": 0.9357142857142857,
+    "avg_top_k_hit": 1.0,
+    "avg_retrieved_context_count": 20.0,
+    "by_category": {
+      "general": {
+        "count": 10,
+        "pass_rate": 0.0
+      }
+    }
+  },
+  "per_question": [
+    {
+      "input": "What arch uses stacked self-attn + point-wise FFN in both enc/dec, incl N=6?",
+      "expected_output": "The **Transformer** architecture uses **stacked self-attention and point-wise fully connected feed-forward networks** in both the **encoder and decoder**, with **N = 6 identical layers** in each stack.",
+      "actual_output": "The Transformer model architecture uses stacked self-attention and point-wise, fully connected layers for both the encoder and decoder, with N = 6 identical layers, as shown in Figure 1.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 977.0,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text",
+          "image",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.5432692307692307,
+          "passed": false,
+          "reason": "The score is 0.54 because several relevant retrieval contexts are ranked near the top, including node 1, which says \"The Transformer follows this overall architecture using stacked self-attention and point-wise, fully connected layers for both the encoder and decoder\" and \"N = 6\" identical layers, and node 4, which states \"each of the layers in our encoder and decoder contains a fully connected feed-forward network.\" However, the score is not higher because multiple irrelevant nodes are interleaved before and after the relevant ones: node 2 focuses on computational complexity and path length, node 3 on positional encoding, and node 6 on a generic attention definition, all of which do not answer the architecture question. Since the relevant nodes are present but not perfectly concentrated at the very top, the precision is only moderate rather than high."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because sentence 1 is fully supported by node(s) in retrieval context: node 1 matches the stacked self-attention and point-wise fully connected feed-forward structure for both encoder and decoder, and nodes 4/5 confirm the encoder/decoder layers include self-attention and feed-forward networks; sentence 2 is also supported by node 1 and node 2, which explicitly state N = 6 identical layers in both the encoder and decoder stacks."
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.20634920634920634,
+          "passed": false,
+          "reason": "The score is 0.21 because the context does mention the right model — \"The Transformer follows this overall architecture using stacked self-attention and point-wise, fully connected layers for both the encoder and decoder\" and \"The encoder is composed of a stack of N = 6 identical layers\" — but much of the retrieved text is still generic or off-target, like \"The statement about 'attention mechanisms' and 'recurrent network' is not relevant\" and other unrelated paper/training details, so only a small portion directly answers the input."
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the response is fully relevant to the question and contains no irrelevant statements. It directly addresses the requested architecture with stacked self-attention and point-wise FFN in both encoder and decoder, including N=6."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output appears fully aligned with the retrieval context. Great job!"
+        }
+      ]
+    },
+    {
+      "input": "How many identical layers (N) are stacked in both Transformer encoder and decoder?",
+      "expected_output": "Both the Transformer encoder and decoder use **N = 6 identical layers** stacked each.",
+      "actual_output": "The Transformer encoder and decoder are each composed of a stack of N = 6 identical layers.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 1019.45,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the first node in retrieval contexts directly answers the question with \"a stack of N = 6 identical layers\" for both encoder and decoder, so the relevant information is ranked at the top. The remaining nodes are irrelevant nodes and are correctly placed lower, since they discuss topics like \"reducing the attention key size dk hurts model quality,\" \"sinusoidal version\" positional encodings, masking, attention mechanics, training details, and references rather than the layer count."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because sentence 1 is fully supported by node 1 in node(s) in retrieval context, which states that both the encoder and decoder use a stack of N = 6 identical layers. Great match!"
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.044444444444444446,
+          "passed": false,
+          "reason": "The score is 0.04 because most of the retrieved text is unrelated detail like \"attention performance and too many heads\" and \"positional encoding,\" while the few relevant statements directly answer the question: \"The encoder is composed of a stack of N = 6 identical layers\" and \"The decoder is also composed of a stack of N = 6 identical layers.\""
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the response fully addresses the question about the number of identical layers in the Transformer encoder and decoder, with no irrelevant content."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output appears fully aligned with the retrieval context. Great job!"
+        }
+      ]
+    },
+    {
+      "input": "How does Transformer replace RNN/CNN with self-attn to model global deps efficiently?",
+      "expected_output": "The Transformer drops recurrence and convolution entirely and uses self-attention to model dependencies between tokens.\n\n- **How it works:** self-attention lets each position attend to all positions in the sequence directly, so it can capture **global dependencies regardless of distance**.\n- **Why it’s efficient:** unlike RNNs, it does **not require sequential computation**, so positions can be processed **in parallel** during training.\n- **Compared with CNNs:** CNN-based models need a number of operations that grows with distance between positions; in the Transformer, relating two positions takes a **constant number of operations**.\n- **Multi-head attention helps:** using multiple heads allows the model to attend to information from **different representation subspaces** at different positions, reducing the loss from simple averaging.\n- **Decoder masking:** in the decoder, self-attention is masked so each position can only attend to earlier positions, preserving the **auto-regressive** property.\n\nSo, the Transformer replaces RNN/CNN structure with **stacked self-attention + feed-forward layers**, gaining **better parallelization** and efficient modeling of long-range relationships.",
+      "actual_output": "The Transformer replaces RNNs/CNNs with self-attention to model global dependencies efficiently by using a self-attention mechanism that connects all positions with a constant number of sequentially executed operations, allowing for more parallelization and reducing the path length between long-range dependencies.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 1024.45,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.81802074631022,
+          "passed": true,
+          "reason": "The score is 0.82 because the most relevant nodes in retrieval contexts are ranked near the top: node 1 says the Transformer is \"relying entirely on an attention mechanism to draw global dependencies\" and \"eschewing recurrence,\" node 2 explains that self-attention lets positions attend to all positions, and node 3 notes a constant number of sequential operations versus \"O(n) sequential operations,\" all directly matching the input. This is strong, but not higher because several irrelevant nodes are still interleaved among the relevant ones, such as node 6 about training details, node 7 on positional encoding, node 11 on abstract/training summary, node 12 on batching, and node 13 on author info, which should be ranked lower than the useful self-attention nodes. Later relevant nodes like node 8, node 9, node 14, node 15, node 19, and node 20 reinforce the same idea with quotes like \"significantly more parallelization,\" \"each position in the encoder can attend to all positions,\" and parallel multi-head attention, but because some irrelevant nodes appear before and between them, the ranking is good rather than perfect."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because sentence 1 is fully supported by node(s) in retrieval context 1/3/4/6, which say the Transformer drops recurrence and convolutions and uses self-attention to model dependencies; sentence 2 is supported by nodes 6/10, sentence 3 by nodes 6/10/11, sentence 4 by nodes 11/16, sentence 5 by node 7, and the concluding sentence is supported by nodes 2/6/10/11. There are no unsupported sentences."
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.49295774647887325,
+          "passed": false,
+          "reason": "The score is 0.49 because the context does address the core idea that “The Transformer is a model architecture eschewing recurrence and instead relying entirely on an attention mechanism to draw global dependencies” and that “a self-attention layer connects all positions with a constant number of sequentially executed operations,” but it is diluted by many off-topic details like “BLEU score and number of attention heads,” “model size and dropout regularization,” and training/citation fragments that do not explain the RNN/CNN replacement directly."
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the response stays fully focused on how Transformer uses self-attention to replace RNNs/CNNs and model global dependencies efficiently, with no irrelevant statements."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output appears fully aligned with the retrieval context. Great job!"
+        }
+      ]
+    },
+    {
+      "input": "How is 8-head attention applied in enc self-attn, dec masked self-attn, and enc-dec attn?",
+      "expected_output": "8-head attention is used in all three attention sublayers by splitting attention into 8 parallel heads, where each head uses projected queries, keys, and values with dimensions \\(d_k=d_v=64\\) since \\(d_{model}=512\\) and \\(512/8=64\\). The heads are concatenated and projected to produce the final output.\n\nApplied in the Transformer:\n\n- **Encoder self-attention:** queries, keys, and values all come from the encoder’s previous layer, so each encoder position can attend to all positions in the encoder.\n- **Decoder masked self-attention:** queries, keys, and values all come from the decoder’s previous layer, but attention to future positions is masked (set to \\(-\\infty\\) before softmax), so each position attends only up to and including itself.\n- **Encoder-decoder attention:** queries come from the previous decoder layer, while keys and values come from the encoder output, so each decoder position can attend over all input positions.",
+      "actual_output": "I do not know the specific details of how 8-head attention is applied in enc self-attn, dec masked self-attn, and enc-dec attn, as this information is not provided in the given text excerpts and figure captions.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 992.15,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "image",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.44796176046176045,
+          "passed": false,
+          "reason": "The score is 0.45 because some relevant retrieval context nodes are correctly placed near the top, but several irrelevant nodes still appear before and between them. For example, node 1 is irrelevant since it only mentions positional encodings and says it does not explain how '8-head attention' is applied, while node 2 is relevant because it says 'we modify the self-attention sub-layer in the decoder stack to prevent positions from attending to subsequent positions,' so it should rank above node 1. Likewise, node 6 is relevant because it states 'The encoder contains self-attention layers' and that decoder self-attention is masked, but node 3 and node 4 are irrelevant because they discuss 'attention key size' and general self-attention properties rather than the three attention sublayers. Node 8 is also relevant since it says 'project the queries, keys and values h times' and 'perform the attention function in parallel,' but it is ranked after multiple irrelevant nodes, which lowers precision. Overall, the score is moderate because the retrieval does surface useful nodes about multi-head attention, masking, and encoder-decoder structure, but not consistently early enough, so irrelevant nodes are not ranked lower than the yes nodes often enough."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because sentence 1 is fully supported by node(s) in retrieval context 1 and sentence 2 is fully supported by node(s) in retrieval context 6, which explicitly cover encoder self-attention, decoder masked self-attention, and encoder-decoder attention; no sentence is left unsupported."
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.2230769230769231,
+          "passed": false,
+          "reason": "The score is 0.22 because the retrieved text mostly discusses general Transformer mechanics like \"Multi-Head Attention performs h learned linear projections\" and the \"decoder\" using a \"Masked Multi-Head Attention\" sub-layer, but it does not directly explain how \"8-head attention\" is applied in the specific encoder self-attn, decoder masked self-attn, and encoder-decoder attention settings. Most of the context is off-topic, focusing on things like \"positional encodings,\" citations, and other unrelated Transformer details."
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the response is fully on-topic and directly addresses how 8-head attention is used in encoder self-attention, decoder masked self-attention, and encoder-decoder attention, with no irrelevant content."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output appears fully faithful to the retrieval context. Great job keeping it aligned!"
+        }
+      ]
+    },
+    {
+      "input": "Name the proposed architecture, incl. self-attn-only design, and contrast parallelization vs RNN/CNN.",
+      "expected_output": "The proposed architecture is the **Transformer**. It is a **self-attention-only** sequence transduction model that **dispenses with both recurrence and convolutions entirely**, using stacked **self-attention** and **point-wise fully connected layers** in an encoder-decoder setup.\n\n**Parallelization contrast:**\n- **Vs RNNs:** RNNs compute sequentially across positions, which limits parallelization within a training example. The Transformer removes this sequential recurrence, allowing **significantly more parallelization**.\n- **Vs CNNs:** CNN-based models parallelize better than RNNs, but relating distant positions requires operations that grow with distance (**linear for ConvS2S, logarithmic for ByteNet**). In the Transformer, this is reduced to a **constant number of operations** via self-attention.",
+      "actual_output": "The proposed architecture is called the Transformer. It relies entirely on self-attention to compute representations of its input and output, without using sequence-aligned RNNs or convolution. This self-attention-only design allows for significantly more parallelization compared to recurrent neural networks (RNNs) and convolutional neural networks (CNNs). While RNNs require O(n) sequential operations and CNNs have a logarithmic or linear increase in the number of operations with distance, the Transformer reduces this to a constant number of operations.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 1019.3,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "image",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.9375370661084946,
+          "passed": true,
+          "reason": "The score is 0.94 because the relevant nodes in retrieval contexts are ranked very highly overall: nodes 1–10 and 13, 14, 18, and 20 clearly support the proposed architecture as 'the Transformer,' described as 'the first transduction model relying entirely on self-attention' and 'eschew[ing] recurrence,' with 'significantly more parallelization' than recurrent approaches. The few irrelevant nodes are mostly pushed lower, including node 11 and node 12, which are about 'end-to-end memory networks' and 'English constituency parsing,' and later reference-list nodes such as 15–19 that are not useful for the architecture or RNN/CNN contrast. The score is not higher because some irrelevant nodes are still interleaved after many relevant ones, so the ranking is very strong but not perfectly clean."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because every sentence in the expected output is fully supported by the retrieval context: sentence 1 aligns with nodes in retrieval context 1/2/4/9 describing the encoder-decoder Transformer with stacked self-attention and feed-forward layers, sentence 2 matches nodes 6/8/9 stating it is self-attention-only and drops recurrence/convolutions, sentence 3 matches nodes 8/6/9 on the parallelization gains over RNNs, and sentence 4 matches nodes 5/7 on CNN/ByteNet/ConvS2S needing distance-growing operations while the Transformer uses a constant number of operations. Great coverage!"
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.5072463768115942,
+          "passed": false,
+          "reason": "The score is 0.51 because the context does contain key Transformer details like “We propose the Transformer, a model architecture eschewing recurrence and instead relying entirely on an attention mechanism” and “A self-attention layer connects all positions with a constant number of sequentially executed operations,” which support the self-attn-only and parallelization contrast. However, much of the retrieval is off-topic, including “visual description detail” such as layers being “depicted as rectangular blocks,” plus unrelated training/bibliography content like “We trained on the standard WMT 2014 English-German dataset” and “arXiv:1706.03762v7,” so it is only partially relevant."
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the response fully addresses the requested architecture naming, the self-attention-only design, and the contrast between parallelization and RNN/CNN approaches without any irrelevant content."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 0.8571428571428571,
+          "passed": true,
+          "reason": "The score is 0.86 because the actual output incorrectly generalizes the context by attributing logarithmic or linear operation growth to CNNs in general, even though the context only says ConvS2S has linear growth with distance and ByteNet has logarithmic growth."
+        }
+      ]
+    },
+    {
+      "input": "What specific benefits does the self-attention Transformer claim over RNN/ConvS2S/ByteNet seq2seq models?",
+      "expected_output": "The Transformer claims these advantages over RNN-, ConvS2S-, and ByteNet-based seq2seq models:\n\n- **No recurrence or convolution**: it relies entirely on **self-attention** to compute input/output representations.\n- **More parallelization**: unlike RNNs, it avoids inherently sequential computation, so training can be parallelized much more effectively.\n- **Better handling of long-range dependencies**: in ConvS2S and ByteNet, relating distant positions requires operations that grow with distance (**linear** for ConvS2S, **logarithmic** for ByteNet), while in the Transformer this is **constant**.\n- **Faster training with strong quality**: the paper says it reaches **state-of-the-art translation quality** with significantly less training time, e.g. strong results after training on **eight P100 GPUs** for as little as **12 hours** in one setting.",
+      "actual_output": "The Transformer model claims several benefits over RNN, ConvS2S, and ByteNet seq2seq models, including:\n\n1. Reduced computational complexity per layer, as self-attention layers are faster than recurrent layers when the sequence length is long.\n2. More parallelization, as self-attention layers can be parallelized more easily than recurrent layers.\n3. A constant number of operations to relate signals from two arbitrary input or output positions, whereas RNNs, ConvS2S, and ByteNet require O(n), linear, or logarithmic operations, respectively.\n4. Easier learning of long-range dependencies due to the shorter path length between input and output positions.\n\nThese benefits allow the Transformer model to achieve state-of-the-art results in translation quality while requiring significantly less computational time.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 1022.15,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "image",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.9185406698564594,
+          "passed": true,
+          "reason": "The score is 0.92 because the relevant nodes in retrieval contexts are ranked very highly overall: rank 1 quotes that the Transformer “eschew[s] recurrence” and uses “entirely on an attention mechanism,” rank 2 highlights “significantly more parallelization,” rank 3 notes the work is reduced “to a constant number of operations,” and ranks 4–8 and 10, 16, 19 reinforce the same benefits with quotes about global dependencies, constant sequential operations, and being “much faster and more space-efficient in practice.” It is not 1.0 because several irrelevant nodes still appear interleaved after the strong early matches—especially ranks 9, 11, 12, 13, 14, 15, 17, 18, and 20—which are acknowledgments, figure descriptions, references, or training details that do not answer the comparison and should be ranked lower than the supporting nodes in retrieval contexts."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because sentence 1 is fully supported by nodes in retrieval context 1 and 2 describing self-attention with no recurrence/convolution, sentence 2 by nodes 1 and 2 on greater parallelization, sentence 3 by nodes 2 and 6 on constant-length paths versus linear/logarithmic ones, and sentence 4 by nodes 2 and 5 on strong translation quality with as little as 12 hours on eight P100 GPUs; no sentence is unsupported."
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.12598425196850394,
+          "passed": false,
+          "reason": "The score is 0.13 because most retrieved text is about unrelated architecture/training details, e.g. \"reducing the attention key size dk hurts model quality\" and \"This section describes the training regime for our models,\" while only a few statements address the actual comparison, such as \"The Transformer allows for significantly more parallelization\" and \"A self-attention layer connects all positions with a constant number of sequentially executed operations\"."
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the response fully addresses the question about the Transformer’s claimed advantages over RNN, ConvS2S, and ByteNet seq2seq models, with no irrelevant statements to reduce relevance. Great, focused answer."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output appears fully aligned with the retrieval context. Great job!"
+        }
+      ]
+    },
+    {
+      "input": "If Transformer base/big replaced prior MT systems, which models would their BLEU/FLOPs surpass?",
+      "expected_output": "According to Table 2, the Transformer models surpass these prior MT systems:\n\n- **Transformer (base)**: **27.3 BLEU (EN-DE)**, **38.1 BLEU (EN-FR)**, **3.3×10^18 FLOPs**\n  - **EN-DE BLEU** surpasses: ByteNet (23.75), GNMT+RL (24.6), ConvS2S (25.16), MoE (26.03), GNMT+RL Ensemble (26.30), ConvS2S Ensemble (26.36)\n  - It also does so at a **fraction of the training cost** of competitive models.\n\n- **Transformer (big)**: **28.4 BLEU (EN-DE)**, **41.8 BLEU (EN-FR)**, **2.3×10^19 FLOPs**\n  - **EN-DE BLEU** surpasses all listed prior models and ensembles, including ConvS2S Ensemble (26.36) and GNMT+RL Ensemble (26.30)\n  - **EN-FR BLEU** surpasses all listed prior models, including Deep-Att+PosUnk (39.2), GNMT+RL (39.92), ConvS2S (40.46), MoE (40.56), Deep-Att+PosUnk Ensemble (40.4), GNMT+RL Ensemble (41.16), and ConvS2S Ensemble (41.29)\n\nSo, **Transformer base beats all previously published EN-DE models listed**, and **Transformer big beats all listed prior systems on both EN-DE and EN-FR**, while using much lower or competitive FLOPs.",
+      "actual_output": "I do not know. The provided evidence does not contain information about the specific models that the Transformer base/big models' BLEU/FLOPs would surpass.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 968.3,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "image",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.6538572538572537,
+          "passed": false,
+          "reason": "The score is 0.65 because several relevant nodes in retrieval contexts are placed near the top, such as node 1, node 2, and node 4, which mention that Transformer results are useful for comparing base/big models against prior MT systems and “reach a new state of the art in translation quality.” However, the ranking is not higher because multiple irrelevant nodes are interleaved above and between these useful nodes, like node 3, node 5, and node 6, which only discuss positional encodings, self-attention, or author info and do not identify which prior MT systems are surpassed. Later useful nodes, such as node 7 and node 9, add FLOPs/efficiency and base-model context, but they appear after several irrelevant nodes in retrieval contexts, so the relevant information is present but not consistently ranked above unrelated content."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the retrieval context fully supports the expected output: sentence 1’s Table 2 summary and sentence 2’s Transformer base/big BLEU and FLOPs comparisons are attributable to nodes 1 and 2 in retrieval context, including the EN-DE/EN-FR results and prior-system benchmarks. Sentence 3’s overall conclusion is also covered by those same nodes, so there are no missing or unsupported statements."
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.07857142857142857,
+          "passed": false,
+          "reason": "The score is 0.08 because most of the retrieved text is about Transformer architecture, training, and citations like \"eschewing recurrence\" and \"significantly more parallelization,\" while the input specifically asks which prior MT models Transformer base/big would surpass in BLEU/FLOPs. A few lines mention translation and self-attention, but none answer the model-comparison question."
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 0.5,
+          "passed": false,
+          "reason": "The score is 0.50 because the response only makes a generic uncertainty statement instead of answering which specific models Transformer base/big would outperform in BLEU/FLOPs. It earns some credit for being somewhat related to the topic, but it is not higher since it never identifies or compares any models as asked."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output appears fully aligned with the retrieval context. Great job!"
+        }
+      ]
+    },
+    {
+      "input": "If Transformer faced a new benchmark, what do its WMT14 BLEU, dev PPL/BLEU, WSJ23 F1 imply?",
+      "expected_output": "It suggests the Transformer would likely be very competitive on a new benchmark, because the reported results show strong performance, good generalization, and scalable model quality:\n\n- **WMT14 translation:** It achieved **28.4 BLEU on English-German** and about **41.0–41.8 BLEU on English-French**, setting or surpassing prior state of the art while using relatively low training cost.\n- **Dev-set behavior:** The **base model** gets **4.92 PPL / 25.8 BLEU** on newstest2013, while the **big model** improves to **4.33 PPL / 26.4 BLEU**, indicating that lower perplexity tracks with better translation quality and that larger models help.\n- **Generalization beyond translation:** On **WSJ23 constituency parsing**, the Transformer reaches **91.3 F1** in the WSJ-only setting and **92.7 F1** in the semi-supervised setting, outperforming most prior systems except the Recurrent Neural Network Grammar.\n\nSo overall, these numbers imply the Transformer is not just strong on WMT14, but also **generalizes well to new tasks and likely new benchmarks**.",
+      "actual_output": "I do not know. The evidence does not provide enough information to determine the implications of the Transformer's performance on a new benchmark based on its WMT14 BLEU, dev PPL/BLEU, and WSJ23 F1 scores.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 952.95,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "image",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.5554480564155487,
+          "passed": false,
+          "reason": "The score is 0.56 because several relevant nodes in retrieval contexts are ranked high, such as node 1, which says it “directly supports the claims about generalization,” node 4, which says the Transformer “can reach a new state of the art in translation quality,” and node 6, which says “The Transformer achieves better BLEU scores than previous state-of-the-art models.” These top-ranked nodes appropriately support the benchmark interpretation, and node 9 also helps with the WSJ23 F1 implication. However, the score is not higher because multiple irrelevant nodes are interleaved above and between the relevant ones—for example node 2 focuses on being “the first transduction model relying entirely on self-attention,” node 3 is about positional encodings and “nearly identical results,” and node 7 discusses computational complexity rather than the specific benchmark outcomes. Since these irrelevant nodes appear before or alongside the useful ones, the ranking is only moderately precise rather than highly precise."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 0.75,
+          "passed": true,
+          "reason": "The score is 0.75 because sentence 1 is well supported by node(s) in retrieval context 1 and 8, which report better-than-state-of-the-art WMT14 BLEU at a fraction of training cost and larger models doing better; sentence 2 is also supported by node(s) 1 and 8 via the base/big model BLEU and perplexity results. Sentence 3 is supported by node(s) 1 and 8 as well, since the parsing section says the Transformer generalizes to other tasks and gives WSJ F1 scores. However, the final concluding sentence overreaches: node 1 only mentions WMT14 and cost, not the broader claim that it is likely to generalize well to new benchmarks, so that part cannot be fully attributed to the retrieval context."
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.013605442176870748,
+          "passed": false,
+          "reason": "The score is 0.01 because the retrieval mostly contains unrelated architecture, training, and citation details, such as \"the statement about attention settings and BLEU performance is not relevant\" and \"This discusses model quality changes from 'reducing the attention key size dk', which is unrelated.\" Only broad context like \"The Transformer is a model architecture that eschews recurrence and relies entirely on an attention mechanism\" and \"Table 2 summarizes our results and compares our translation quality and training costs\" is somewhat relevant, but it does not specifically explain what \"WMT14 BLEU, dev PPL/BLEU, WSJ23 F1 imply\"."
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the response would be fully focused on interpreting the Transformer’s WMT14 BLEU, dev PPL/BLEU, and WSJ23 F1 metrics with no irrelevant content, so it directly addresses the input as well as possible."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output appears fully aligned with the retrieval context. Great job! "
+        }
+      ]
+    },
+    {
+      "input": "Per the paper, how does Transformer replace RNN/CNNs with self-attn, and why is it more parallelizable?",
+      "expected_output": "Per the paper, the Transformer is the first sequence transduction model **based entirely on attention**, replacing the recurrent layers used in encoder-decoder architectures with **multi-headed self-attention** and **dispensing with recurrence and convolutions entirely**.\n\nIt is more parallelizable because **RNNs compute sequentially across positions**: each hidden state depends on the previous one, which prevents parallel computation within a sequence. In contrast, the Transformer **computes representations for all positions in parallel using self-attention**, so it avoids that sequential bottleneck and trains significantly faster. The paper also notes that self-attention can relate distant positions with a **constant number of operations**, unlike CNN-based approaches where this grows with distance.",
+      "actual_output": "The Transformer replaces RNNs/CNNs with self-attention mechanisms, allowing it to draw global dependencies between input and output without using recurrence or convolutions. This is more parallelizable because self-attention layers can be computed in parallel, whereas recurrent layers require sequential operations. As noted in the text on page 5, \"a self-attention layer connects all positions with a constant number of sequentially executed operations, whereas a recurrent layer requires O(n) sequential operations.\" This is further illustrated in the text on page 6, which states that \"one key factor affecting the ability to learn such dependencies is the length of the paths forward and backward signals have to traverse in the network. The shorter these paths between any combination of positions in the input and output sequences, the easier it is to learn long-range dependencies.\"",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 1021.8,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.891417998120301,
+          "passed": true,
+          "reason": "The score is 0.89 because the relevant retrieval context nodes are ranked very well overall: the top nodes directly say the Transformer is “based solely on attention mechanisms, dispensing with recurrence and convolutions entirely” and that self-attention is “faster than recurrent layers,” so the core answer appears early. The score is not higher because a few irrelevant nodes are interleaved lower in the ranking, such as node 7 (“This is about training details and GPU time; it does not explain how Transformer replaces RNN/CNNs with self-attention or why it is more parallelizable.”), node 11 (“applied to each position separately”), node 13 (a references section), and node 17 (another references section). These irrelevant nodes should be ranked lower than the yes nodes because they do not address the replacement of RNN/CNNs or the parallelization benefit, while the yes nodes, especially nodes 1, 2, 6, 8, 15, and 16, directly explain that the model relies on self-attention instead of recurrence/convolution and enables more parallel computation."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because every sentence is fully supported: sentence 1 matches nodes in retrieval context 1 and 3, which state the Transformer is based solely on attention and dispenses with recurrence and convolutions; sentence 2 matches node 2, which explains that recurrent layers require sequential operations while self-attention is more parallelizable; sentence 3 is also supported by node 2, which says self-attention relates positions regardless of distance with a constant number of operations."
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.36220472440944884,
+          "passed": false,
+          "reason": "The score is 0.36 because the retrieval includes some directly relevant ideas like “the Transformer, based solely on attention mechanisms, dispensing with recurrence and convolutions entirely” and “self-attention layer connects all positions with a constant number of sequentially executed operations, whereas a recurrent layer requires O(n) sequential operations,” but much of the context is off-topic, such as “The statement is about BLEU score and number of attention heads” and “The statement is about training data and semi-supervised learning,” so it only partially answers the question."
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 0.875,
+          "passed": true,
+          "reason": "The score is 0.88 because the response mostly addresses how Transformers use self-attention, but it includes a general point about learning dependencies and path lengths that does not directly answer the question about replacing RNNs/CNNs or the specific parallelization benefit. It is still quite relevant overall, so the score remains high."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output appears fully aligned with the retrieval context. Great job!"
+        }
+      ]
+    },
+    {
+      "input": "Compare Transformer’s WMT14 En-De vs En-Fr translation performance, incl. BLEU and training cost/time.",
+      "expected_output": "On WMT 2014:\n\n- **English-to-German (En-De):** Transformer achieved **28.4 BLEU**, improving the previous best results, including ensembles, by **over 2 BLEU**.\n- **English-to-French (En-Fr):** Transformer achieved **41.8 BLEU**, setting a new **single-model** state of the art.\n\n**Training cost/time:**\n- For **En-Fr**, the 41.8 BLEU result was reached after **3.5 days on 8 GPUs**, described as only a **small fraction of the training cost** of the best prior models.\n- More generally, the paper says Transformer models require **significantly less training time** and can be trained **faster than recurrent or convolutional architectures**.\n\nSo, **En-Fr had the higher BLEU score (41.8 vs 28.4)**, while both tasks showed strong performance and improved training efficiency.",
+      "actual_output": "According to Table 2 on page 7, the Transformer achieves better BLEU scores than previous state-of-the-art models on the English-to-German and English-to-French newstest2014 tests at a fraction of the training cost. However, the exact BLEU scores and training costs are not provided in the given evidence.",
+      "category": "general",
+      "success": false,
+      "retrieval_metrics": {
+        "retrieved_context_count": 20,
+        "top_k_hit": true,
+        "average_context_length": 920.7,
+        "modality_hit_rate": null,
+        "retrieved_modalities": [
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "text",
+          "image",
+          "text",
+          "text",
+          "image",
+          "text",
+          "image",
+          "text"
+        ]
+      },
+      "metrics": [
+        {
+          "name": "Contextual Precision",
+          "score": 0.48045051353874885,
+          "passed": false,
+          "reason": "The score is 0.48 because the most relevant nodes in retrieval contexts are present but not consistently ranked above irrelevant ones. The first and second nodes in retrieval contexts are irrelevant, since they discuss 'English Constituency Parsing' and positional encodings rather than the requested WMT14 En-De vs En-Fr comparison, so they should be lower. Relevant nodes start at rank 3 with 'The Transformer achieves better BLEU scores...' and continue at ranks 4, 6, 7, 8, and 17, but these are interleaved with many irrelevant nodes such as ranks 5, 9-16, and 18-21 that cover architecture, references, and acknowledgments. The score is not higher because the relevant evidence about BLEU and training cost/time is scattered rather than concentrated at the top, but it is at this level because several retrieval contexts do directly support the translation performance and training-time comparison."
+        },
+        {
+          "name": "Contextual Recall",
+          "score": 0.4,
+          "passed": false,
+          "reason": "The score is 0.40 because sentence 3 is only loosely supported: node 3 in retrieval context mentions WMT tasks and better BLEU, and nodes 9-10 support faster training/3.5 days, but sentence 1 (28.4 BLEU for En-De) and sentence 2 (41.8 BLEU single-model SOTA for En-Fr) are not directly stated in any node, and the final comparison in sentence 4 (En-Fr higher than En-De) is also not supported by any node."
+        },
+        {
+          "name": "Contextual Relevancy",
+          "score": 0.08264462809917356,
+          "passed": false,
+          "reason": "The score is 0.08 because most retrieved text is off-topic, focusing on architecture details and citations, while only a few lines directly answer the query, such as “The Transformer achieves better BLEU scores” on WMT 2014 En-De/En-Fr and “trained ... for as little as twelve hours on eight P100 GPUs.”"
+        },
+        {
+          "name": "Answer Relevancy",
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because the response fully addresses the comparison of Transformer WMT14 En-De vs En-Fr translation performance, including BLEU and training cost/time, with no irrelevant statements."
+        },
+        {
+          "name": "Faithfulness",
+          "score": 0.5,
+          "passed": false,
+          "reason": "The score is 0.50 because the actual output seems to miss or contradict the retrieval context’s exact BLEU scores and training-cost details, even though the context clearly states the Transformer’s state-of-the-art results after as little as 12 hours on 8 P100 GPUs and gives the WMT 2014 English-German and English-French dataset/training information."
+        }
+      ]
+    }
+  ]
+}

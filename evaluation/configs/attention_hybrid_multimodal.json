@@ -1,0 +1,8 @@
+{
+  "dataset": "attention_is_all_you_need",
+  "strategy": "hybrid",
+  "modality_mode": "multimodal",
+  "top_k": 20,
+  "chunking_profile": "research",
+  "use_rerank": true
+}

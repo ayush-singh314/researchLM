@@ -1,0 +1,52 @@
+[
+  {
+    "input": "What arch uses stacked self-attn + point-wise FFN in both enc/dec, incl N=6?",
+    "expected_output": "The **Transformer** architecture uses **stacked self-attention and point-wise fully connected feed-forward networks** in both the **encoder and decoder**, with **N = 6 identical layers** in each stack.",
+    "category": "general"
+  },
+  {
+    "input": "How many identical layers (N) are stacked in both Transformer encoder and decoder?",
+    "expected_output": "Both the Transformer encoder and decoder use **N = 6 identical layers** stacked each.",
+    "category": "general"
+  },
+  {
+    "input": "How does Transformer replace RNN/CNN with self-attn to model global deps efficiently?",
+    "expected_output": "The Transformer drops recurrence and convolution entirely and uses self-attention to model dependencies between tokens.\n\n- **How it works:** self-attention lets each position attend to all positions in the sequence directly, so it can capture **global dependencies regardless of distance**.\n- **Why it’s efficient:** unlike RNNs, it does **not require sequential computation**, so positions can be processed **in parallel** during training.\n- **Compared with CNNs:** CNN-based models need a number of operations that grows with distance between positions; in the Transformer, relating two positions takes a **constant number of operations**.\n- **Multi-head attention helps:** using multiple heads allows the model to attend to information from **different representation subspaces** at different positions, reducing the loss from simple averaging.\n- **Decoder masking:** in the decoder, self-attention is masked so each position can only attend to earlier positions, preserving the **auto-regressive** property.\n\nSo, the Transformer replaces RNN/CNN structure with **stacked self-attention + feed-forward layers**, gaining **better parallelization** and efficient modeling of long-range relationships.",
+    "category": "general"
+  },
+  {
+    "input": "How is 8-head attention applied in enc self-attn, dec masked self-attn, and enc-dec attn?",
+    "expected_output": "8-head attention is used in all three attention sublayers by splitting attention into 8 parallel heads, where each head uses projected queries, keys, and values with dimensions \\(d_k=d_v=64\\) since \\(d_{model}=512\\) and \\(512/8=64\\). The heads are concatenated and projected to produce the final output.\n\nApplied in the Transformer:\n\n- **Encoder self-attention:** queries, keys, and values all come from the encoder’s previous layer, so each encoder position can attend to all positions in the encoder.\n- **Decoder masked self-attention:** queries, keys, and values all come from the decoder’s previous layer, but attention to future positions is masked (set to \\(-\\infty\\) before softmax), so each position attends only up to and including itself.\n- **Encoder-decoder attention:** queries come from the previous decoder layer, while keys and values come from the encoder output, so each decoder position can attend over all input positions.",
+    "category": "general"
+  },
+  {
+    "input": "Name the proposed architecture, incl. self-attn-only design, and contrast parallelization vs RNN/CNN.",
+    "expected_output": "The proposed architecture is the **Transformer**. It is a **self-attention-only** sequence transduction model that **dispenses with both recurrence and convolutions entirely**, using stacked **self-attention** and **point-wise fully connected layers** in an encoder-decoder setup.\n\n**Parallelization contrast:**\n- **Vs RNNs:** RNNs compute sequentially across positions, which limits parallelization within a training example. The Transformer removes this sequential recurrence, allowing **significantly more parallelization**.\n- **Vs CNNs:** CNN-based models parallelize better than RNNs, but relating distant positions requires operations that grow with distance (**linear for ConvS2S, logarithmic for ByteNet**). In the Transformer, this is reduced to a **constant number of operations** via self-attention.",
+    "category": "general"
+  },
+  {
+    "input": "What specific benefits does the self-attention Transformer claim over RNN/ConvS2S/ByteNet seq2seq models?",
+    "expected_output": "The Transformer claims these advantages over RNN-, ConvS2S-, and ByteNet-based seq2seq models:\n\n- **No recurrence or convolution**: it relies entirely on **self-attention** to compute input/output representations.\n- **More parallelization**: unlike RNNs, it avoids inherently sequential computation, so training can be parallelized much more effectively.\n- **Better handling of long-range dependencies**: in ConvS2S and ByteNet, relating distant positions requires operations that grow with distance (**linear** for ConvS2S, **logarithmic** for ByteNet), while in the Transformer this is **constant**.\n- **Faster training with strong quality**: the paper says it reaches **state-of-the-art translation quality** with significantly less training time, e.g. strong results after training on **eight P100 GPUs** for as little as **12 hours** in one setting.",
+    "category": "general"
+  },
+  {
+    "input": "If Transformer base/big replaced prior MT systems, which models would their BLEU/FLOPs surpass?",
+    "expected_output": "According to Table 2, the Transformer models surpass these prior MT systems:\n\n- **Transformer (base)**: **27.3 BLEU (EN-DE)**, **38.1 BLEU (EN-FR)**, **3.3×10^18 FLOPs**\n  - **EN-DE BLEU** surpasses: ByteNet (23.75), GNMT+RL (24.6), ConvS2S (25.16), MoE (26.03), GNMT+RL Ensemble (26.30), ConvS2S Ensemble (26.36)\n  - It also does so at a **fraction of the training cost** of competitive models.\n\n- **Transformer (big)**: **28.4 BLEU (EN-DE)**, **41.8 BLEU (EN-FR)**, **2.3×10^19 FLOPs**\n  - **EN-DE BLEU** surpasses all listed prior models and ensembles, including ConvS2S Ensemble (26.36) and GNMT+RL Ensemble (26.30)\n  - **EN-FR BLEU** surpasses all listed prior models, including Deep-Att+PosUnk (39.2), GNMT+RL (39.92), ConvS2S (40.46), MoE (40.56), Deep-Att+PosUnk Ensemble (40.4), GNMT+RL Ensemble (41.16), and ConvS2S Ensemble (41.29)\n\nSo, **Transformer base beats all previously published EN-DE models listed**, and **Transformer big beats all listed prior systems on both EN-DE and EN-FR**, while using much lower or competitive FLOPs.",
+    "category": "general"
+  },
+  {
+    "input": "If Transformer faced a new benchmark, what do its WMT14 BLEU, dev PPL/BLEU, WSJ23 F1 imply?",
+    "expected_output": "It suggests the Transformer would likely be very competitive on a new benchmark, because the reported results show strong performance, good generalization, and scalable model quality:\n\n- **WMT14 translation:** It achieved **28.4 BLEU on English-German** and about **41.0–41.8 BLEU on English-French**, setting or surpassing prior state of the art while using relatively low training cost.\n- **Dev-set behavior:** The **base model** gets **4.92 PPL / 25.8 BLEU** on newstest2013, while the **big model** improves to **4.33 PPL / 26.4 BLEU**, indicating that lower perplexity tracks with better translation quality and that larger models help.\n- **Generalization beyond translation:** On **WSJ23 constituency parsing**, the Transformer reaches **91.3 F1** in the WSJ-only setting and **92.7 F1** in the semi-supervised setting, outperforming most prior systems except the Recurrent Neural Network Grammar.\n\nSo overall, these numbers imply the Transformer is not just strong on WMT14, but also **generalizes well to new tasks and likely new benchmarks**.",
+    "category": "general"
+  },
+  {
+    "input": "Per the paper, how does Transformer replace RNN/CNNs with self-attn, and why is it more parallelizable?",
+    "expected_output": "Per the paper, the Transformer is the first sequence transduction model **based entirely on attention**, replacing the recurrent layers used in encoder-decoder architectures with **multi-headed self-attention** and **dispensing with recurrence and convolutions entirely**.\n\nIt is more parallelizable because **RNNs compute sequentially across positions**: each hidden state depends on the previous one, which prevents parallel computation within a sequence. In contrast, the Transformer **computes representations for all positions in parallel using self-attention**, so it avoids that sequential bottleneck and trains significantly faster. The paper also notes that self-attention can relate distant positions with a **constant number of operations**, unlike CNN-based approaches where this grows with distance.",
+    "category": "general"
+  },
+  {
+    "input": "Compare Transformer’s WMT14 En-De vs En-Fr translation performance, incl. BLEU and training cost/time.",
+    "expected_output": "On WMT 2014:\n\n- **English-to-German (En-De):** Transformer achieved **28.4 BLEU**, improving the previous best results, including ensembles, by **over 2 BLEU**.\n- **English-to-French (En-Fr):** Transformer achieved **41.8 BLEU**, setting a new **single-model** state of the art.\n\n**Training cost/time:**\n- For **En-Fr**, the 41.8 BLEU result was reached after **3.5 days on 8 GPUs**, described as only a **small fraction of the training cost** of the best prior models.\n- More generally, the paper says Transformer models require **significantly less training time** and can be trained **faster than recurrent or convolutional architectures**.\n\nSo, **En-Fr had the higher BLEU score (41.8 vs 28.4)**, while both tasks showed strong performance and improved training efficiency.",
+    "category": "general"
+  }
+]

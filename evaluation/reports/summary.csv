@@ -1,2 +1,4 @@
 timestamp,run_id,dataset,strategy,modality_mode,embedding_model,num_questions,pass_rate,avg_contextual_precision,avg_contextual_recall,avg_contextual_relevancy,avg_answer_relevancy,avg_faithfulness,avg_top_k_hit,avg_retrieved_context_count,text_category_pass_rate,figure_category_pass_rate
 2026-05-18T18:59:47.905519+00:00,20260518T185438Z,openclaw,dense,text_only,text-embedding-3-small,10,0.4,1.0,0.9333333333333333,0.6850178161847991,0.8890509828009827,0.9732142857142858,1.0,4.0,,
+2026-05-18T19:39:27.316124+00:00,20260518T193506Z,openclaw,hybrid,text_only,text-embedding-3-small,10,0.6,1.0,0.9547619047619047,0.7031652053321974,0.8983936651583709,0.9723076923076924,1.0,4.0,,
+    2026-05-18T20:25:26.549884+00:00,20260518T201721Z,attention_is_all_you_need,hybrid,multimodal,text-embedding-3-small,10,0.0,0.7246503295438018,0.915,0.21370851723864673,0.9375,0.9357142857142857,1.0,20.0,,

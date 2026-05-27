@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -59,6 +59,8 @@ class ExperimentConfig:
     top_k: int = 4
     max_contexts: int = 5
     goldens_per_context: int = 2
+    chunking_profile: str = "default"
+    use_rerank: bool = True
 
 
 @dataclass
@@ -172,7 +174,25 @@ def _run_deepeval_with_guard(
         ) from exc
 
 
-def _load_corpus(dataset: DatasetInfo, modality_mode: str) -> list[Document]:
+def merge_config_with_dataset_defaults(
+    config: ExperimentConfig,
+    dataset: DatasetInfo,
+) -> ExperimentConfig:
+    """Apply dataset eval_defaults only for fields still at global defaults."""
+    defaults = dataset.metadata.get("eval_defaults") or {}
+    baseline = ExperimentConfig(dataset=config.dataset)
+    updates: dict = {}
+    for key, value in defaults.items():
+        if hasattr(config, key) and getattr(config, key) == getattr(baseline, key):
+            updates[key] = value
+    return replace(config, **updates) if updates else config
+
+
+def _load_corpus(
+    dataset: DatasetInfo,
+    modality_mode: str,
+    chunking_profile: str,
+) -> list[Document]:
     include_images = modality_mode == MODALITY_MULTIMODAL
     all_docs: list[Document] = []
     for source_path in dataset.source_paths:
@@ -180,6 +200,7 @@ def _load_corpus(dataset: DatasetInfo, modality_mode: str) -> list[Document]:
             str(source_path),
             paper_title=source_path.stem,
             include_images=include_images,
+            chunking_profile=chunking_profile,
         )
         if modality_mode == MODALITY_TEXT_ONLY:
             docs = [d for d in docs if d.metadata.get("modality", "text") == "text"]
@@ -192,10 +213,13 @@ def _generate_answer(query: str, retrieved_docs: list[Document]) -> str:
         return "I don't know the answer."
     context = format_retrieved_context(retrieved_docs)
     prompt = (
-        "Answer the question using ONLY the evidence below from uploaded research papers.\n"
-        "Evidence may include text excerpts and figure captions. "
-        "Do not invent details beyond the evidence.\n\n"
-        f"{context}\n\nQuestion: {query}"
+        "You are a research paper QA assistant. Answer using ONLY the evidence below.\n"
+        "Evidence includes text excerpts and figure captions from the paper.\n"
+        "Rules:\n"
+        "- If the evidence is insufficient, say you do not know.\n"
+        "- Do not invent numbers, labels, or claims not supported by the evidence.\n"
+        "- Prefer citing figure/table captions when the question is visual.\n\n"
+        f"Evidence:\n{context}\n\nQuestion: {query}\n\nAnswer:"
     )
     llm = ChatGroq(model="llama-3.3-70b-versatile")
     return llm.invoke([{"role": "user", "content": prompt}]).content
@@ -276,18 +300,30 @@ def run_experiment(config: ExperimentConfig) -> dict:
     session_id = f"eval_{config.dataset}_{config.strategy}_{uuid4().hex[:8]}"
 
     logger.info(
-        "Starting experiment run_id=%s dataset=%s strategy=%s modality=%s embedding=%s",
+        "Starting experiment run_id=%s dataset=%s strategy=%s modality=%s embedding=%s top_k=%s",
         run_id,
         config.dataset,
         config.strategy,
         config.modality_mode,
         config.embedding_model,
+        config.top_k,
+    )
+    print(
+        f"\n[eval] dataset={config.dataset} strategy={config.strategy} "
+        f"modality={config.modality_mode} top_k={config.top_k} "
+        f"chunking={config.chunking_profile} rerank={config.use_rerank}"
     )
 
-    corpus = _load_corpus(dataset, config.modality_mode)
+    corpus = _load_corpus(dataset, config.modality_mode, config.chunking_profile)
+    print(f"[eval] indexed chunks: {len(corpus)} (text + image captions)")
     index = EvalVectorIndex(session_id=session_id, embedding_model=config.embedding_model)
     index.index_documents(corpus)
-    retriever = create_retriever(index, config.strategy, top_k=config.top_k)
+    retriever = create_retriever(
+        index,
+        config.strategy,
+        top_k=config.top_k,
+        use_rerank=config.use_rerank,
+    )
 
     test_cases: list[LLMTestCase] = []
     question_results: list[QuestionResult] = []
@@ -367,6 +403,8 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "metric_threshold": config.metric_threshold,
         "deepeval_model": config.deepeval_model,
         "top_k": config.top_k,
+        "chunking_profile": config.chunking_profile,
+        "use_rerank": config.use_rerank,
         "session_id": session_id,
         "summary": summary,
         "per_question": [

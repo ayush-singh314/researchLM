@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import math
 import re
-from collections import defaultdict
 
 from langchain_classic.embeddings import CacheBackedEmbeddings
 from langchain_classic.storage import LocalFileStore
@@ -14,6 +12,7 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client.models import Distance, VectorParams
 from rank_bm25 import BM25Okapi
 
+from backend.hybrid_retrieval import bm25_retrieve, reciprocal_rank_fusion
 from backend.vector_store import qdrant_client
 
 EMBEDDING_DIMS: dict[str, int] = {
@@ -143,15 +142,8 @@ class EvalVectorIndex:
 
     def hybrid_search(self, query: str, k: int = 4) -> list[Document]:
         """Reciprocal rank fusion of BM25 and dense results."""
-        dense_docs = self.dense_search(query, k=k * 2)
-        bm25_docs = self.bm25_search(query, k=k * 2)
-        fused: dict[str, tuple[float, Document]] = {}
-        for rank, doc in enumerate(dense_docs):
-            key = doc.page_content[:200]
-            fused[key] = (fused.get(key, (0.0, doc))[0] + 1.0 / (60 + rank + 1), doc)
-        for rank, doc in enumerate(bm25_docs):
-            key = doc.page_content[:200]
-            prev_score, existing_doc = fused.get(key, (0.0, doc))
-            fused[key] = (prev_score + 1.0 / (60 + rank + 1), existing_doc)
-        ranked = sorted(fused.values(), key=lambda x: x[0], reverse=True)
-        return [doc for _, doc in ranked[:k]]
+        candidate_k = max(k * 3, 40)
+        dense_docs = self.dense_search(query, k=candidate_k)
+        corpus = self._bm25_docs or self._scroll_all_documents()
+        bm25_docs = bm25_retrieve(query, corpus, k=candidate_k)
+        return reciprocal_rank_fusion([dense_docs, bm25_docs], k=k)

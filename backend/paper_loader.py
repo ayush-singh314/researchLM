@@ -12,6 +12,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from backend.image_captioner import generate_image_caption
 from backend.models import ExtractedImage
 from backend.pdf_images import extract_pdf_images, page_text_map, paper_id_from_title
+from backend.research_chunking import chunk_research_paper_pages
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +37,41 @@ def _stamp_title(docs: list[Document], title: str) -> list[Document]:
     return docs
 
 
-def _image_to_document(extracted: ExtractedImage, caption: str, title: str) -> Document:
+def _nearby_page_context(page_texts: dict[int, str], page_number: int, max_chars: int = 500) -> str:
+    """Return explanatory text near a figure on the same page."""
+    raw = page_texts.get(page_number, "").strip()
+    if not raw:
+        return ""
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", raw) if p.strip()]
+    kept: list[str] = []
+    total = 0
+    for para in paragraphs:
+        if re.match(r"^(?:Figure|Table|Fig\.)\s*\d+", para, re.I):
+            continue
+        if total + len(para) > max_chars:
+            break
+        kept.append(para)
+        total += len(para)
+    return "\n".join(kept)[:max_chars]
+
+
+def _image_to_document(
+    extracted: ExtractedImage,
+    caption: str,
+    title: str,
+    page_texts: dict[int, str] | None = None,
+) -> Document:
     """Build a LangChain Document for an image-caption chunk."""
     page = extracted.page_number
-    page_content = f"Figure extracted from page {page}: {caption}"
+    linked = _nearby_page_context(page_texts or {}, page)
+    if linked:
+        page_content = (
+            f"Figure on page {page}.\n"
+            f"Nearby explanatory text: {linked}\n\n"
+            f"Caption: {caption}"
+        )
+    else:
+        page_content = f"Figure extracted from page {page}: {caption}"
     return Document(
         page_content=page_content,
         metadata={
@@ -48,6 +80,7 @@ def _image_to_document(extracted: ExtractedImage, caption: str, title: str) -> D
             "page_number": page,
             "image_path": extracted.image_path,
             "caption": caption,
+            "linked_page_text": linked or None,
             "source_type": "pdf_figure",
             "source_pdf": extracted.source_pdf,
             "paper_id": extracted.paper_id,
@@ -93,7 +126,7 @@ def _load_pdf_image_chunks(pdf_path: str, title: str) -> list[Document]:
                 page_number=img.page_number,
                 context_text=context or None,
             )
-            image_docs.append(_image_to_document(img, caption, title))
+            image_docs.append(_image_to_document(img, caption, title, page_texts=page_texts))
             logger.info(
                 "Indexed image chunk for %s page %s (%s)",
                 title,
@@ -122,11 +155,15 @@ def load_pdf(
     file_path: str,
     paper_title: str | None = None,
     include_images: bool = True,
+    chunking_profile: str = "default",
 ) -> list[Document]:
     resolved_path = _require_existing_pdf(file_path)
     title = paper_title or Path(resolved_path).stem
     raw_docs = PyMuPDFLoader(resolved_path).load()
-    text_docs = _stamp_title(_splitter.split_documents(raw_docs), title)
+    if chunking_profile == "research":
+        text_docs = _stamp_title(chunk_research_paper_pages(raw_docs), title)
+    else:
+        text_docs = _stamp_title(_splitter.split_documents(raw_docs), title)
     image_docs = _load_pdf_image_chunks(resolved_path, title) if include_images else []
     return text_docs + image_docs
 
@@ -205,13 +242,19 @@ def load_document(
     source: str,
     paper_title: str | None = None,
     include_images: bool = True,
+    chunking_profile: str = "default",
 ) -> list[Document]:
     """Dispatch to the appropriate loader based on URL prefix or file extension."""
     if source.startswith(("http://", "https://")):
         return load_webpage(source)
     ext = Path(source).suffix.lower()
     if ext == ".pdf":
-        return load_pdf(source, paper_title=paper_title, include_images=include_images)
+        return load_pdf(
+            source,
+            paper_title=paper_title,
+            include_images=include_images,
+            chunking_profile=chunking_profile,
+        )
     if ext == ".txt":
         return load_text(source)
     if ext in (".md", ".markdown"):

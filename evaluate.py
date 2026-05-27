@@ -21,11 +21,12 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 from dotenv import load_dotenv
 
-from evaluation.dataset_manager import list_datasets
+from evaluation.dataset_manager import bootstrap_openclaw_dataset, list_datasets, load_dataset
 from evaluation.experiment_runner import (
     MODALITY_MULTIMODAL,
     MODALITY_TEXT_ONLY,
     ExperimentConfig,
+    merge_config_with_dataset_defaults,
     run_experiment,
 )
 from evaluation.strategies import STRATEGY_REGISTRY
@@ -105,8 +106,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--top-k",
         type=int,
-        default=4,
+        default=int(os.environ.get("EVAL_TOP_K", "4")),
         help="Number of chunks to retrieve per question",
+    )
+    parser.add_argument(
+        "--chunking-profile",
+        default=os.environ.get("EVAL_CHUNKING_PROFILE", "default"),
+        choices=["default", "research"],
+        help="PDF chunking profile (research preserves section boundaries)",
+    )
+    parser.add_argument(
+        "--no-rerank",
+        action="store_true",
+        help="Disable post-retrieval dedupe and lexical reranking",
     )
     parser.add_argument(
         "--list-datasets",
@@ -135,6 +147,8 @@ def main() -> None:
 
     _print_runtime_config()
 
+    bootstrap_openclaw_dataset()
+    dataset_info = load_dataset(args.dataset)
     config = ExperimentConfig(
         dataset=args.dataset,
         strategy=args.strategy,
@@ -145,7 +159,10 @@ def main() -> None:
         metric_threshold=args.metric_threshold,
         deepeval_model=args.deepeval_model,
         top_k=args.top_k,
+        chunking_profile=args.chunking_profile,
+        use_rerank=not args.no_rerank,
     )
+    config = merge_config_with_dataset_defaults(config, dataset_info)
 
     try:
         result = run_experiment(config)

@@ -1,0 +1,14 @@
+{
+  "dataset_name": "attention_is_all_you_need",
+  "description": "Attention Is All You Need (Vaswani et al., 2017) — transformer architecture paper",
+  "modality": "multimodal",
+  "default_category": "general",
+  "categories": ["text", "figure", "table", "cross_modal", "general"],
+  "eval_defaults": {
+    "strategy": "hybrid",
+    "modality_mode": "multimodal",
+    "top_k": 20,
+    "chunking_profile": "research",
+    "use_rerank": true
+  }
+}
