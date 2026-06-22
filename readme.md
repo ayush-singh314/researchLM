@@ -430,16 +430,14 @@ answer = response.json()["answer"]
 
 ## Future Improvements
 
-- [ ] Multi-query expansion for RAG-Fusion implementation
-- [ ] Cross-encoder reranking for improved precision
+
 - [ ] Distributed ingestion pipeline for large-scale document processing
 - [ ] Real-time streaming responses for long-form answers
 - [ ] Citation extraction and verification
 - [ ] Multi-document synthesis and comparison
 - [ ] Advanced figure/table understanding with vision models
-- [ ] User feedback loop for continuous retrieval optimization
 - [ ] API rate limiting and authentication
-- [ ] Kubernetes deployment manifests
+
 
 ---
 
