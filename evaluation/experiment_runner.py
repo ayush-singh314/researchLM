@@ -24,8 +24,8 @@ from deepeval import evaluate
 from deepeval.evaluate import AsyncConfig
 from deepeval.test_case import LLMTestCase
 
-from backend.paper_loader import load_document
-from backend.retrieval_format import format_retrieved_context
+from backend.rag.paper_loader import load_document
+from backend.rag.format import format_retrieved_context
 from evaluation.dataset_manager import (
     DatasetInfo,
     GoldenItem,
@@ -221,7 +221,7 @@ def _generate_answer(query: str, retrieved_docs: list[Document]) -> str:
         "- Prefer citing figure/table captions when the question is visual.\n\n"
         f"Evidence:\n{context}\n\nQuestion: {query}\n\nAnswer:"
     )
-    llm = ChatGroq(model="llama-3.3-70b-versatile")
+    llm = ChatGroq(model="openai/gpt-oss-120b")
     return llm.invoke([{"role": "user", "content": prompt}]).content
 
 

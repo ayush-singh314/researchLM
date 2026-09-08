@@ -44,7 +44,7 @@ evaluation/
 3. Generate goldens once (cached to `goldens.json`):
 
 ```bash
-python evaluate.py --dataset my_paper --strategy dense --regenerate-goldens
+python scripts/evaluate.py --dataset my_paper --strategy dense --regenerate-goldens
 ```
 
 4. Optionally add per-question categories in `goldens.json`:
@@ -61,13 +61,13 @@ python evaluate.py --dataset my_paper --strategy dense --regenerate-goldens
 
 ```bash
 # Dense retrieval, text-only ingestion
-python evaluate.py --dataset openclaw --strategy dense --modality text_only
+python scripts/evaluate.py --dataset openclaw --strategy dense --modality text_only
 
 # Hybrid retrieval, multimodal ingestion (text + image captions)
-python evaluate.py --dataset openclaw --strategy hybrid --modality multimodal
+python scripts/evaluate.py --dataset openclaw --strategy hybrid --modality multimodal
 
 # BM25 baseline, different embedding model for dense/hybrid components
-python evaluate.py --dataset openclaw --strategy bm25 --modality text_only --embedding-model text-embedding-3-small
+python scripts/evaluate.py --dataset openclaw --strategy bm25 --modality text_only --embedding-model text-embedding-3-small
 ```
 
 ### Useful flags

@@ -6,7 +6,7 @@ import re
 
 from langchain_core.documents import Document
 
-from backend.hybrid_retrieval import chunk_key
+from backend.rag.hybrid_retrieval import chunk_key
 
 _TOKEN_RE = re.compile(r"\w+")
 _FIGURE_QUERY_RE = re.compile(r"\b(figure|fig\.|table|chart|diagram|plot|architecture)\b", re.I)

@@ -12,8 +12,8 @@ from langchain_qdrant import QdrantVectorStore
 from qdrant_client.models import Distance, VectorParams
 from rank_bm25 import BM25Okapi
 
-from backend.hybrid_retrieval import bm25_retrieve, reciprocal_rank_fusion
-from backend.vector_store import qdrant_client
+from backend.rag.hybrid_retrieval import bm25_retrieve, reciprocal_rank_fusion
+from backend.rag.vector_store import qdrant_client
 
 EMBEDDING_DIMS: dict[str, int] = {
     "text-embedding-3-small": 1536,

@@ -219,22 +219,38 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+node_modules/
+
 # claude
 .claude/
 CLAUDE.md
 report.md
 
-# tests
-tests/
+# notebooks
 graph_diag.ipynb
-
 
 # embedding cache
 embedding_cache/
 
+# local ingest output
+documents/extracted_images/
+
+# leftover local state (not the evaluation/ datasets or runs)
+sessions.json
+eval_results.json
+eval_results_error.json
+/goldens.json
+interview
+
 # database
 /*.db
 /*.db-*
+checkpoints.db
 
-# deep eval
+# deep eval / neon CLI
 .deepeval/
+.neon
+.agents/

@@ -1,468 +1,293 @@
-.# ResearchLM – Multimodal Agentic RAG System
+# ResearchLM
 
-[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
-[![LangChain](https://img.shields.io/badge/LangChain-Latest-green.svg)](https://langchain.com/)
-[![Qdrant](https://img.shields.io/badge/Qdrant-VectorDB-red.svg)](https://qdrant.tech/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+A signed-in research workspace that answers questions from **your** PDFs and URLs, streams grounded replies, and turns the thread into editable study notes.
 
-A production-grade multimodal Retrieval-Augmented Generation (RAG) system for intelligent document querying and contextual question answering. ResearchLM ingests research papers, web content, and arXiv publications through a scalable ingestion pipeline, performs hybrid dense+sparse retrieval with advanced reranking, and generates context-aware answers using agentic workflows.
+FastAPI + LangGraph + Qdrant + Neon Postgres, with a Vite React UI and a separate DeepEval retrieval evaluation CLI.
 
 ---
 
 ## Project Overview
 
-ResearchLM is an end-to-end RAG infrastructure designed for high-accuracy document intelligence. The system combines semantic search, lexical retrieval, and intelligent reranking to deliver precise answers from complex technical documents. Built with modular FastAPI services, LangGraph agents, and Qdrant vector storage, it provides a scalable foundation for production RAG deployments.
+Reading papers is slow when answers are buried in PDFs, figures, and related web pages. Generic chatbots often invent citations or mix in knowledge that is not in the document you care about.
 
-**Key Capabilities:**
-- Multi-source document ingestion (PDFs, web URLs, arXiv papers)
-- Multimodal content processing (text, figures, tables)
-- Hybrid retrieval with weighted dense+sparse fusion
-- Post-retrieval reranking for precision optimization
-- Agentic answer generation with LangGraph
-- Comprehensive evaluation framework with DeepEval
+ResearchLM is a **per-session RAG workspace**: you upload papers or paste URLs, ask questions, and get answers produced from retrieved chunks (and optional Tavily web search when the researcher graph routes that way). Chat history is stored in LangGraph’s **Postgres checkpointer**, not a messages table. Study notes are generated from the discussion and saved in Postgres so you can edit and download them.
+
+**Who it is for:** students and researchers who want Q&A and notes grounded in papers they actually ingested—and engineers who want a small, inspectable RAG + eval codebase.
+
+Pipeline map: [docs/architecture.md](docs/architecture.md). Interview study guide: [interview/README.md](interview/README.md).
 
 ---
 
-## Features
+## Key Features
 
-### Document Ingestion
-- **PDF Processing**: Advanced PDF parsing with PyMuFit, supporting text extraction and figure caption extraction
-- **Web Content**: Website scraping and content normalization for web-based documents
-- **ArXiv Integration**: Direct arXiv paper fetching and metadata extraction
-- **Multimodal Support**: Handles text, figures, tables, and cross-modal content
+### Product
 
-### Retrieval Pipeline
-- **Hybrid Retrieval**: Reciprocal Rank Fusion (RRF) combining dense vector similarity and BM25 lexical search
-- **Semantic Search**: OpenAI embeddings with configurable models (text-embedding-3-small/large)
-- **Intelligent Reranking**: Post-retrieval scoring with modality-aware boosting and deduplication
-- **Configurable Strategies**: Dense-only, BM25-only, hybrid, and custom retrieval modes
+- Landing page for guests; Neon Auth sign-in / sign-up (`frontend/src/AuthGate.tsx`)
+- Research sessions owned by JWT `sub` (`backend/api/models.py`, `backend/api/repos.py`)
+- Ingest: PDF / `.txt` / `.md` upload and URL fetch (`POST /sessions/{id}/documents`, `POST /sessions/{id}/urls`)
+- Streaming chat over SSE (`POST /sessions/{id}/chat`); markdown + KaTeX in the UI
+- Study notes: generate from chat, autosave, preview, download `.md`
+- Profile view of notes across sessions (`GET /notes`)
 
-### Evaluation Framework
-- **DeepEval Integration**: Automated evaluation with contextual precision, recall, relevancy, faithfulness, and answer relevancy metrics
-- **Benchmark Suite**: Synthetic golden QA generation for systematic testing
-- **Strategy Comparison**: Side-by-side performance analysis across retrieval strategies
-- **Category-Based Analysis**: Granular evaluation by content type (text, figure, table, cross-modal)
+### RAG / AI
 
-### Scalability
-- **Modular Backend**: Separated ingestion, retrieval, and generation services
-- **Vector Database**: Qdrant for high-performance vector storage and similarity search
-- **Caching Layer**: Embedding cache with LocalFileStore for reduced latency
-- **Session Management**: Persistent conversation state with SQLite checkpoints
+- Per-session Qdrant collections (`papeer_{session_id}`)
+- LangGraph researcher: `router` → retrieve / claim-verify / direct answer → `generate_answer` (`backend/rag/graph.py`)
+- Dense cosine search by default; optional hybrid BM25 + dense **unweighted RRF** (`RRF_K = 60`)
+- PDF figure extraction + `gpt-4o` captions (`backend/rag/pdf_images.py`, `backend/rag/image_captioner.py`)
+- Tavily tools on the retrieve path; claim path also searches `site:arxiv.org` (no arXiv-ID ingest API)
+- Structured LLM outputs via Pydantic (`backend/llm_schemas.py`)
+
+### Evaluation (CLI, not the HTTP chat graph)
+
+- Datasets under `evaluation/datasets/` with cached `goldens.json`
+- Strategies: `keyword`, `bm25`, `dense`, `hybrid`; `rag_fusion` is a stub that falls back to dense
+- DeepEval generation metrics + custom retrieval metrics (`evaluation/metrics.py`)
+- Run artifacts: `evaluation/runs/*.json`, aggregates in `evaluation/reports/summary.csv`
+
+**Also in the API, unused by the current UI:** `POST /sessions/{id}/btw` streams a side-channel web answer (`backend/rag/btw_handler.py`). `frontend/src/api.ts` does not call it.
+
+---
+
+## Technology Stack
+
+| Layer | Technology | Purpose in this repo |
+| --- | --- | --- |
+| Frontend | React 19, Vite, TypeScript | Landing, auth gate, chat, notes |
+| Frontend data | TanStack Query, `fetch` + SSE | Sessions/notes CRUD; chat stream |
+| Frontend rendering | react-markdown, remark-math, rehype-katex, KaTeX, Mermaid | Chat/notes markdown |
+| Auth (client) | `@neondatabase/neon-js` | Neon Auth session + access token |
+| Auth (API) | PyJWT + JWKS | Verify Bearer JWT; `user_id` = `sub` |
+| API | FastAPI, Uvicorn | HTTP routers, CORS, SSE |
+| App DB | Neon Postgres, SQLAlchemy, Alembic, Psycopg | `sessions`, `notes` |
+| Agent memory | LangGraph `PostgresSaver` | Chat thread state (`thread_id` = session id) |
+| Vectors | Qdrant, langchain-qdrant | Per-session embeddings index |
+| Embeddings | OpenAI `text-embedding-3-small` (1536-d), `CacheBackedEmbeddings` | Index + query vectors |
+| Captions | OpenAI `gpt-4o` | Image captions at ingest |
+| LLM | Groq `ChatGroq` model `openai/gpt-oss-120b` | Router, researcher, notes, session titles |
+| Web search | Tavily | Retrieve-path tool + claim verification |
+| Retrieval extras | rank-bm25 | Hybrid path and eval BM25 |
+| Ingest | PyMuPDF, BeautifulSoup / LangChain web loader | PDF pages and URLs |
+| Orchestration | LangGraph, LangChain | Researcher + notes graphs |
+| Evaluation | DeepEval, `scripts/evaluate.py` | Offline RAG experiments |
+
+Listed in `pyproject.toml` but **not imported on live product paths:** `chromadb`, `streamlit`, `arxiv`, `langgraph-checkpoint-sqlite`. Do not treat those as the running stack.
 
 ---
 
 ## System Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Document Sources                           │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │   PDF    │  │   Web    │  │  arXiv   │  │   Text   │        │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘        │
-└───────┼────────────┼────────────┼────────────┼──────────────────┘
-        │            │            │            │
-        └────────────┴────────────┴────────────┘
-                     │
-                     ▼
-        ┌──────────────────────────────┐
-        │   Ingestion Pipeline         │
-        │  • Content Extraction        │
-        │  • Multimodal Parsing        │
-        │  • Chunking (Research Profile)│
-        │  • Figure/Caption Merging     │
-        └──────────────┬───────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │   Embedding Generation       │
-        │  • OpenAI Embeddings API     │
-        │  • LocalFileStore Cache      │
-        │  • Configurable Models       │
-        └──────────────┬───────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │   Qdrant Vector Database     │
-        │  • Dense Vector Index        │
-        │  • Metadata Storage          │
-        │  • Similarity Search         │
-        └──────────────┬───────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │   Hybrid Retrieval           │
-        │  • Dense Search (0.7 weight) │
-        │  • BM25 Search (0.3 weight)  │
-        │  • Reciprocal Rank Fusion    │
-        └──────────────┬───────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │   Reranking Pipeline         │
-        │  • Deduplication             │
-        │  • Modality-Aware Boosting    │
-        │  • Lexical Scoring           │
-        │  • Top-K Selection (K=4)     │
-        └──────────────┬───────────────┘
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │   Answer Generation          │
-        │  • LangGraph Agent           │
-        │  • Context Formatting        │
-        │  • Groq LLM (Llama 3.3)      │
-        │  • Faithfulness Guardrails   │
-        └──────────────────────────────┘
+Two long-lived processes: the API (`uvicorn main:app`) and the Vite dev server. Evaluation is a third, offline path.
+
+```mermaid
+flowchart LR
+  User --> Frontend
+  Frontend --> NeonAuth[Neon Auth]
+  Frontend --> API[FastAPI]
+  API --> JWKS[Neon Auth JWKS]
+  API --> Postgres[(Neon Postgres)]
+  API --> Checkpointer[PostgresSaver]
+  API --> Qdrant[(Qdrant)]
+  API --> Groq[Groq LLM]
+  API --> OpenAI[OpenAI embeddings and captions]
+  API --> Tavily[Tavily]
 ```
 
----
-
-## Tech Stack
-
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Backend Framework** | FastAPI, LangGraph | API services, agentic workflows |
-| **Vector Database** | Qdrant | High-performance vector storage |
-| **Embeddings** | OpenAI (text-embedding-3-small/large) | Semantic vector generation |
-| **LLM** | Groq (Llama 3.3-70B) | Answer generation |
-| **Document Processing** | PyMuFit, PyPDF, BeautifulSoup | PDF parsing, web scraping |
-| **Retrieval** | LangChain, rank-bm25 | Hybrid retrieval implementation |
-| **Evaluation** | DeepEval | Automated RAG evaluation |
-| **Frontend** | Streamlit | Interactive web interface |
-| **State Management** | LangGraph Checkpoint (SQLite) | Conversation persistence |
-| **Caching** | LocalFileStore | Embedding cache optimization |
+More detail: [docs/architecture.md](docs/architecture.md) and [interview/architecture/system-architecture.md](interview/architecture/system-architecture.md).
 
 ---
 
-## Retrieval Pipeline
+## How the System Works
 
-### 1. Document Ingestion
-Documents are processed through a modular ingestion pipeline:
-- **PDF Parsing**: Extract text, figures, and tables with page-level metadata
-- **Web Scraping**: Fetch and normalize web content with BeautifulSoup
-- **ArXiv Integration**: Retrieve papers with metadata via arXiv API
-- **Chunking**: Research-profile chunking preserves section boundaries and figure context
-
-### 2. Embedding Generation
-- OpenAI embeddings generate dense vector representations
-- Configurable embedding models (text-embedding-3-small: 1536 dims, text-embedding-3-large: 3072 dims)
-- LocalFileStore cache reduces API calls and latency
-- Batch processing for efficient embedding generation
-
-### 3. Hybrid Retrieval
-The system employs weighted hybrid retrieval:
-- **Dense Retrieval (70% weight)**: Cosine similarity search in Qdrant
-- **Sparse Retrieval (30% weight)**: BM25 lexical search for exact matches
-- **Reciprocal Rank Fusion**: Combines rankings with configurable weights
-- **Candidate Expansion**: Fetches 3× top-K candidates for reranking
-
-### 4. Reranking Pipeline
-Post-retrieval optimization:
-- **Deduplication**: Removes duplicate chunks using stable chunk keys
-- **Modality-Aware Boosting**: Prioritizes figure/table chunks for visual queries
-- **Lexical Scoring**: Token overlap scoring with position penalties
-- **Top-K Selection**: Returns top-4 highest-confidence chunks
-
-### 5. Answer Generation
-- LangGraph agent manages conversation state and routing
-- Context formatting combines retrieved chunks into coherent evidence
-- Groq LLM generates answers with faithfulness constraints
-- Session persistence enables multi-turn conversations
-
----
-
-## Evaluation Framework
-
-ResearchLM includes a comprehensive evaluation framework for systematic RAG optimization:
-
-### Metrics
-- **Contextual Precision**: Measures retrieval precision relative to expected output
-- **Contextual Recall**: Evaluates coverage of relevant information
-- **Contextual Relevancy**: Assesses relevance of retrieved contexts
-- **Answer Relevancy**: Measures answer quality relative to query
-- **Faithfulness**: Ensures answers are grounded in retrieved contexts
-- **Top-K Hit Rate**: Binary metric for relevant chunk presence in top-K
-- **Retrieval Metrics**: Context count, modality hit rate, chunk statistics
-
-### Benchmark Generation
-- DeepEval Synthesizer generates synthetic QA pairs from source documents
-- Configurable context construction (max contexts per document, goldens per context)
-- Category-based labeling (text, figure, table, cross-modal, general)
-- Cached golden datasets for reproducible evaluation
-
-### Strategy Comparison
-- Side-by-side evaluation of dense, BM25, hybrid, and custom strategies
-- Per-category performance analysis
-- Cross-run CSV aggregation for trend analysis
-- Detailed JSON artifacts per run for debugging
-
----
-
-## Performance Highlights
-
-Through systematic retrieval optimization and hybrid search tuning, ResearchLM achieves:
-
-| Metric | Baseline | Optimized | Improvement |
-|--------|----------|-----------|-------------|
-| **Pass Rate** | 40% | 60% | +50% |
-| **Faithfulness** | 95% | 97% | +2% |
-| **Contextual Relevancy** | 0.55 | 0.65 | +18% |
-| **Top-K Hit Rate** | 0.45 | 0.70 | +56% |
-
-**Key Optimizations:**
-- Dense retrieval weight increased to 70% for semantic signal prioritization
-- Sparse retrieval reduced to 30% to minimize noise from multimodal mismatches
-- Top-K reduced from 20 to 4 for focused, high-confidence retrieval
-- Chunk preprocessing removes noisy figure-only chunks and duplicates
-- Reranking with modality-aware boosting improves visual query handling
-
----
-
-## Key Engineering Contributions
-
-### Retrieval Optimization
-- Implemented weighted hybrid retrieval with configurable dense/sparse balance
-- Developed reciprocal rank fusion with custom weight tuning
-- Optimized top-K selection for precision over recall
-- Reduced retrieval latency through embedding caching and batch processing
-
-### Reranking Pipeline
-- Built modality-aware reranking that boosts figure/table chunks for visual queries
-- Implemented deduplication using stable chunk keys to eliminate redundant contexts
-- Added lexical scoring with position penalties for result diversification
-- Configurable reranking parameters for strategy tuning
-
-### Evaluation Framework
-- Designed comprehensive evaluation pipeline with DeepEval integration
-- Implemented synthetic golden QA generation for systematic testing
-- Built category-based analysis for granular performance insights
-- Created strategy comparison framework for A/B testing
-
-### Scalable Ingestion Pipeline
-- Modular document loaders for PDFs, web content, and arXiv papers
-- Research-profile chunking preserves section boundaries and figure context
-- Multimodal processing merges figures with nearby textual explanations
-- Configurable preprocessing pipeline for different document types
-
-### Modular Backend Services
-- Separated ingestion, retrieval, and generation into independent services
-- LangGraph agents for complex multi-step reasoning workflows
-- Session management with SQLite checkpoints for state persistence
-- FastAPI-ready architecture for production deployment
-
----
-
-## Folder Structure
-
+```text
+Sign in (Neon Auth JWT)
+  → FastAPI verifies JWKS, sets user_id = sub
+  → Create session (Postgres)
+  → Upload PDF / URLs → chunk (+ optional captions) → Qdrant collection papeer_{session}
+  → Chat SSE → LangGraph researcher (thread_id = session id)
+       router → retrieve | verify_claim | direct_answer → generate_answer
+  → GET messages reads checkpoint state (no messages table)
+  → Notes generate: supervisor → planner → section writers → assemble → INSERT notes
 ```
+
+**Evaluation (separate):** golden QA → eval-scoped Qdrant index → strategy retriever → Groq answer prompt in `evaluation/experiment_runner.py` → DeepEval → `evaluation/runs` + `evaluation/reports/summary.csv`. This path does **not** invoke `backend/rag/graph.py`.
+
+---
+
+## Evaluation & Metrics
+
+**What was evaluated:** retrieval + a simple Groq answer on cached goldens (10 questions per reported run).
+
+**How:** `python scripts/evaluate.py --dataset … --strategy … --modality …`  
+Default DeepEval threshold is **0.7** (`--metric-threshold`). Default judge model in the CLI is `gpt-5.4-mini`.
+
+**Pass rate:** fraction of questions where DeepEval marks the test case `success` (in the saved runs, that is all five generation metrics passing). Implemented in `evaluation/experiment_runner.py` (`_aggregate_deepeval_results`).
+
+**Custom retrieval:** `top_k_hit` is token-overlap of expected answer vs a retrieved context at ratio **≥ 0.08** (`evaluation/metrics.py`).
+
+Values below are copied from [`evaluation/reports/summary.csv`](evaluation/reports/summary.csv). Embedding model for all three rows: `text-embedding-3-small`. **Do not treat these as production chat-graph metrics.**
+
+| Dataset | Strategy | Modality | n | pass_rate | Contextual Precision | Contextual Recall | Contextual Relevancy | Answer Relevancy | Faithfulness | avg_top_k_hit | avg_retrieved_context_count |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| openclaw | dense | text_only | 10 | 0.4 | 1.0 | 0.9333333333333333 | 0.6850178161847991 | 0.8890509828009827 | 0.9732142857142858 | 1.0 | 4.0 |
+| openclaw | hybrid | text_only | 10 | 0.6 | 1.0 | 0.9547619047619047 | 0.7031652053321974 | 0.8983936651583709 | 0.9723076923076924 | 1.0 | 4.0 |
+| attention_is_all_you_need | hybrid | multimodal | 10 | 0.0 | 0.7246503295438018 | 0.915 | 0.21370851723864673 | 0.9375 | 0.9357142857142857 | 1.0 | 20.0 |
+
+**How to read this:** on the text-only OpenClaw set, hybrid’s pass_rate is higher than dense (0.6 vs 0.4) with similar faithfulness. On the multimodal Attention paper run, **every question failed the overall pass** (`pass_rate = 0.0`) while faithfulness and answer relevancy stayed high and `avg_top_k_hit` was still 1.0—contextual relevancy dropped to ~0.21 with 20 contexts per question. With n=10, pass_rate moves in 0.1 steps; it is brittle.
+
+`evaluation/reports/eval_results.json` is per-question detail for the Attention hybrid run only, not a second summary of all three experiments.
+
+---
+
+## Technical Highlights
+
+- **Tenancy without stuffing identity into the agent state:** `sessions.user_id` / `notes.user_id` equal JWT `sub`. `RAGState` has `session_id` but not `user_id` (`backend/rag/graph.py`). Ownership is enforced in the API (`require_owned_session`).
+- **Conversation persistence:** one `PostgresSaver`; `GET /sessions/{id}/messages` reconstructs chat from checkpoint (`backend/api/serialize.py`).
+- **Session-scoped vectors:** collection name `papeer_{session_id with '-' → '_'}` so uploads do not share an index across chats.
+- **Researcher routing:** structured `RouterDecision` before retrieval; retrieve path can call vector search and Tavily, with a relevancy check and at most one query rewrite.
+- **Streaming UX:** SSE events `token` | `done` | `error`; empty/failed answers use a shared fallback string in API and UI.
+- **Eval isolation:** strategy comparison does not require standing up the chat graph or auth.
+
+---
+
+## Design / Engineering Decisions
+
+**Postgres checkpointer for chat, not SQLite**  
+Why: session metadata and notes already live on Neon; `thread_id` is the session UUID.  
+In repo: live code uses `PostgresSaver` (`backend/api/checkpoint.py`). `langgraph-checkpoint-sqlite` remains in `pyproject.toml` but is unused on live import paths.  
+Trade-off: checkpointer tables are created by `saver.setup()`, not Alembic.
+
+**Dense retrieval as app default; hybrid is opt-in**  
+Why: `RETRIEVAL_STRATEGY` defaults to `dense` in `backend/rag/vector_store.py`. Hybrid fetches `k*2` dense and BM25 lists, then RRF.  
+Trade-off: hybrid needs a full collection scroll for BM25 (cached in-process). Eval additionally has a lexical rerank step the **chat path does not use**.
+
+**Eval pipeline separate from LangGraph chat**  
+Why: cheap strategy A/B on goldens without agent routing, tools, or SSE.  
+Trade-off: reported metrics are **not** a measure of the production researcher graph.
+
+**JWKS verification with `verify_aud: False`**  
+Why: Neon Auth JWTs are verified for signature, algorithm, and issuer (`backend/api/auth.py`). Audience is not checked.  
+Trade-off: simpler local setup; weaker audience binding than a locked `aud` check.
+
+---
+
+## Project Structure
+
+```text
 researchlm/
-├── backend/                    # Core backend services
-│   ├── btw_handler.py         # Side-channel query handler
-│   ├── hybrid_retrieval.py    # BM25 and RRF implementation
-│   ├── image_captioner.py     # Image caption extraction
-│   ├── paper_loader.py        # Document ingestion pipeline
-│   ├── pdf_images.py          # PDF image extraction
-│   ├── rag_graph.py           # LangGraph agent definition
-│   ├── research_chunking.py   # Research-profile chunking
-│   ├── retrieval_format.py    # Context formatting
-│   └── vector_store.py        # Qdrant client management
-├── evaluation/                # Evaluation framework
-│   ├── chunk_preprocessor.py  # Chunk preprocessing and filtering
-│   ├── dataset_manager.py     # Dataset discovery and golden QA management
-│   ├── experiment_runner.py   # End-to-end experiment execution
-│   ├── metrics.py             # DeepEval metrics and retrieval metrics
-│   ├── optimized_evaluator.py # Comprehensive evaluation pipeline
-│   ├── optimized_retrieval.py # Optimized retrieval with dense weighting
-│   ├── report_writer.py       # Result persistence (JSON/CSV)
-│   ├── retrieval_pipeline.py  # Post-retrieval deduplication and reranking
-│   ├── strategies.py          # Retrieval strategy registry
-│   ├── vector_index.py        # Eval-scoped Qdrant indexing
-│   ├── configs/               # Example experiment configurations
-│   ├── datasets/              # Evaluation datasets
-│   │   ├── bert/              # BERT paper dataset
-│   │   ├── openclaw/          # OpenClaw research report
-│   │   └── attention_is_all_you_need/  # Attention paper
-│   ├── runs/                  # Per-run JSON artifacts
-│   └── reports/               # Aggregated evaluation reports
-├── documents/                 # Document storage
-├── embedding_cache/           # Embedding cache
-├── app.py                     # Streamlit web interface
-├── evaluate.py                # CLI evaluation entry point
-├── main.py                    # Application entry point
-├── pyproject.toml             # Project dependencies
-└── requirements.txt           # Python requirements
+├── frontend/                 # Vite React UI
+├── backend/
+│   ├── api/                  # FastAPI, JWT, Postgres sessions/notes, HTTP
+│   ├── rag/                  # Ingest, Qdrant, researcher graph, BTW
+│   ├── notes/                # Notes LangGraph
+│   └── llm_schemas.py        # Structured LLM models (not SQLAlchemy)
+├── evaluation/               # CLI metrics, datasets, runs, reports
+├── scripts/                  # evaluate.py, rag_smoke.py, qdrant_ping.py
+├── alembic/                  # sessions/notes migrations
+├── docs/architecture.md
+├── documents/                # eval-referenced PDFs (e.g. OpenClaw report)
+├── main.py                   # uvicorn main:app
+├── .env.example
+├── frontend/.env.example
+└── interview/                # Interview study guide
 ```
 
 ---
 
-## Installation
+## Getting Started
 
 ### Prerequisites
-- Python 3.12+
-- Qdrant instance (local or cloud)
-- OpenAI API key
-- Groq API key
 
-### Setup
+- Python **3.12+** (`pyproject.toml` `requires-python`)
+- Node.js (Vite frontend; no `engines` field in `frontend/package.json`)
+- Qdrant (`QDRANT_URL`)
+- Neon (or other) Postgres (`DATABASE_URL`)
+- Neon Auth base URL
+- API keys: OpenAI, Groq, Tavily (as used by embeddings, captions, ChatGroq, web search)
+
+### Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/researchlm.git
-cd researchlm
-
-# Create virtual environment
+# clone your copy of the repo, then:
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Windows: .venv\Scripts\activate
+# Unix:    source .venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
+# or: uv sync
 
-# Configure environment variables
-cp .env.example .env
-# Edit .env with your API keys
+copy .env.example .env          # Windows
+# cp .env.example .env          # Unix
+# fill DATABASE_URL, NEON_AUTH_URL, QDRANT_*, OPENAI_API_KEY, GROQ_API_KEY, TAVILY_API_KEY
+
+cd frontend
+copy .env.example .env          # set VITE_NEON_AUTH_URL and VITE_API_BASE_URL
+npm install
 ```
 
-### Environment Variables
+Optional migrations (API startup also runs `Base.metadata.create_all` and a user_id column check in `backend/api/db.py`):
 
 ```bash
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-
-# Groq Configuration
-GROQ_API_KEY=your_groq_api_key
-
-# Qdrant Configuration
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=your_qdrant_api_key  # Optional for local instance
-
-# Evaluation Configuration
-EVAL_MAX_CONCURRENT=1
-EVAL_THROTTLE_VALUE=5
-EVAL_MAX_TEST_CASES=
-EVAL_TOP_K=4
-EVAL_CHUNKING_PROFILE=research
+alembic upgrade head
 ```
+
+### Run
+
+```bash
+# repo root — API (docs at http://localhost:8000/docs, health GET /health)
+uvicorn main:app --reload
+
+# frontend
+cd frontend
+npm run dev
+```
+
+UI default: `http://localhost:5173`. CORS default: `http://localhost:5173`.
+
+### Evaluate
+
+```bash
+python scripts/evaluate.py --list-datasets
+python scripts/evaluate.py --dataset openclaw --strategy dense --modality text_only
+python scripts/evaluate.py --dataset openclaw --strategy hybrid --modality text_only
+```
+
+Do not use `--dataset bert` unless you add `evaluation/datasets/bert/metadata.json`; the PDF alone is not listable.
+
+### Environment (placeholders only)
+
+Root `.env.example`: `DATABASE_URL`, optional `CHECKPOINT_DATABASE_URL`, `NEON_AUTH_URL`, `CORS_ORIGINS`, `OPENAI_API_KEY`, `GROQ_API_KEY`, `QDRANT_URL`, `QDRANT_API_KEY`, `TAVILY_API_KEY`, `RETRIEVAL_STRATEGY`.
+
+Frontend: `VITE_API_BASE_URL=http://localhost:8000`, `VITE_NEON_AUTH_URL=<neon-auth-base-url>`.
+
+Never commit `.env`.
 
 ---
 
-## Running the Project
+## Usage
 
-### Streamlit Web Interface
-
-```bash
-streamlit run app.py
-```
-
-Access the interface at `http://localhost:8501`
-
-### CLI Evaluation
-
-```bash
-# List available datasets
-python evaluate.py --list-datasets
-
-# Run evaluation with dense retrieval
-python evaluate.py --dataset bert --strategy dense --modality multimodal
-
-# Run evaluation with hybrid retrieval
-python evaluate.py --dataset bert --strategy hybrid --modality multimodal --top-k 4
-
-# Regenerate golden QA pairs
-python evaluate.py --dataset bert --strategy dense --regenerate-goldens
-```
-
-### API Workflow
-
-```python
-from backend.paper_loader import load_document
-from backend.vector_store import add_paper
-from backend.rag_graph import build_graph
-
-# Load and index a document
-docs = load_document("path/to/paper.pdf", paper_title="My Paper")
-add_paper(docs, session_id="session_123")
-
-# Build the RAG graph
-graph = build_graph()
-
-# Query with LangGraph
-config = {"configurable": {"thread_id": "session_123"}}
-state = graph.invoke(
-    {"messages": [{"role": "user", "content": "What is BERT?"}]},
-    config=config
-)
-```
-
----
-
-## API Examples
-
-### Document Upload
-
-```python
-import requests
-
-# Upload a PDF
-files = {"file": open("paper.pdf", "rb")}
-response = requests.post(
-    "http://localhost:8000/upload",
-    files=files,
-    params={"session_id": "session_123"}
-)
-```
-
-### Query Endpoint
-
-```python
-# Query the RAG system
-response = requests.post(
-    "http://localhost:8000/query",
-    json={
-        "query": "Explain the attention mechanism",
-        "session_id": "session_123",
-        "top_k": 4
-    }
-)
-answer = response.json()["answer"]
-```
+1. Open the landing page and sign in (or sign up) with Neon Auth.
+2. Create a session.
+3. Upload a PDF (or `.txt` / `.md`) and/or add URLs.
+4. Ask questions in chat; tokens stream in. History reloads from the checkpointer.
+5. Generate study notes from the thread; edit and download markdown. Profile lists notes across sessions.
 
 ---
 
 ## Future Improvements
 
+These are gaps relative to the current code, not unfinished items described as done:
 
-- [ ] Distributed ingestion pipeline for large-scale document processing
-- [ ] Real-time streaming responses for long-form answers
-- [ ] Citation extraction and verification
-- [ ] Multi-document synthesis and comparison
-- [ ] Advanced figure/table understanding with vision models
-- [ ] API rate limiting and authentication
-
-
----
-
-## License
-
-MIT License - see LICENSE file for details
-
----
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a pull request for any improvements.
-
----
-
-## Contact
-
-For questions or collaboration, please open an issue on GitHub.
+- Wire or remove `POST /sessions/{id}/btw` in the UI
+- Implement eval `rag_fusion` (currently a stub → dense)
+- Investigate the multimodal Attention run (`pass_rate = 0.0`, low contextual relevancy)
+- API rate limiting (auth exists; throttling does not)
+- Drop unused Python dependencies (`chromadb`, `streamlit`, `arxiv`, sqlite checkpointer package)
+- Audience (`aud`) verification on JWTs if Neon Auth issues a stable audience
+- Container / hosting manifests are not in this repo
 
 ---
 
 ## Acknowledgments
 
-- LangChain for the retrieval and agent framework
-- Qdrant for the high-performance vector database
-- DeepEval for the comprehensive evaluation toolkit
-- OpenAI for embedding models
-- Groq for fast LLM inference
+LangChain / LangGraph, Qdrant, DeepEval, OpenAI embeddings, Groq, Tavily, and Neon (Postgres + Auth).

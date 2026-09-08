@@ -29,4 +29,13 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "streamlit>=1.57.0",
     "tavily-python>=0.7.24",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2.0",
+    "alembic>=1.14.0",
+    "python-multipart>=0.0.12",
+    "pyjwt>=2.13.0",
+    "cryptography>=50.0.1",
+    "langgraph-checkpoint-postgres>=3.1.2",
 ]
