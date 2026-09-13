@@ -1,3 +1,11 @@
+"""Per-session Qdrant index for chat RAG: embed, add/list/delete papers, hybrid or dense search.
+
+Used by `backend.api.ingest` (writes) and `backend.rag.graph` retrieve tool (reads).
+Eval uses `evaluation.vector_index.EvalVectorIndex` instead — a separate collection namespace.
+Isolation is the collection name `papeer_{session_id}`, not a metadata filter.
+Default retrieve: 0.9/0.1 weighted RRF then MiniLM cross-encoder, then top-k.
+"""
+
 import logging
 import os
 
@@ -11,22 +19,20 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, VectorParams
 
 from backend.rag.hybrid_retrieval import bm25_retrieve, reciprocal_rank_fusion
+from backend.rag.rerank import postprocess_retrieved, use_cross_encoder
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# In-memory corpus cache for BM25 (invalidated on add_paper).
+# BM25 needs the full session corpus in RAM; drop on add/delete so it cannot go stale.
 _session_corpus_cache: dict[str, list[Document]] = {}
 
-# ── Config ───────────────────────────────────────────────────────────────────
-
-EMBEDDING_DIM = 1536  # text-embedding-3-small
-
-# ── Singletons ────────────────────────────────────────────────────────────────
+EMBEDDING_DIM = 1536  # must match text-embedding-3-small or Qdrant insert fails
 
 base_embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 embedding_file_store = LocalFileStore("./embedding_cache/")
+# Same query twice → disk cache, not another OpenAI embed call.
 embeddings = CacheBackedEmbeddings.from_bytes_store(
     base_embeddings,
     embedding_file_store,
@@ -42,13 +48,13 @@ qdrant_client = QdrantClient(
 )
 
 
-# ── Collection ───────────────────────────────────────────────────────────────
-
 def get_collection_name(session_id: str) -> str:
+    """Map session UUID → Qdrant collection; hyphens become underscores (Qdrant name rules)."""
     return f"papeer_{session_id.replace('-', '_')}"
 
 
 def get_vectorstore(session_id: str) -> QdrantVectorStore:
+    """Get or create this session's collection (cosine, dim 1536) and wrap it for LangChain."""
     collection_name = get_collection_name(session_id)
     if not qdrant_client.collection_exists(collection_name):
         qdrant_client.create_collection(
@@ -62,19 +68,19 @@ def get_vectorstore(session_id: str) -> QdrantVectorStore:
     )
 
 
-# ── Public API ───────────────────────────────────────────────────────────────
-
 def _ensure_chunk_metadata(doc: Document) -> Document:
-    """Ensure text chunks have modality metadata; image chunks are set at ingestion."""
+    """Default modality to text; image chunks already set this at ingest."""
     doc.metadata.setdefault("modality", "text")
     return doc
 
 
 def _invalidate_corpus_cache(session_id: str) -> None:
+    """Clear BM25 cache after the collection changes."""
     _session_corpus_cache.pop(session_id, None)
 
 
 def _scroll_session_documents(session_id: str) -> list[Document]:
+    """Read every point's payload — required to build a BM25 corpus (Qdrant is vectors-only)."""
     collection_name = get_collection_name(session_id)
     if not qdrant_client.collection_exists(collection_name):
         return []
@@ -101,13 +107,14 @@ def _scroll_session_documents(session_id: str) -> list[Document]:
 
 
 def _get_session_corpus(session_id: str) -> list[Document]:
+    """Cached full-collection scroll for hybrid BM25."""
     if session_id not in _session_corpus_cache:
         _session_corpus_cache[session_id] = _scroll_session_documents(session_id)
     return _session_corpus_cache[session_id]
 
 
 def add_paper(docs: list[Document], session_id: str) -> None:
-    """Index text and image-caption chunks in the session vector store."""
+    """Embed and upsert chunks into this session only; then refresh BM25 cache."""
     if not docs:
         return
     normalized = [_ensure_chunk_metadata(doc) for doc in docs]
@@ -116,6 +123,7 @@ def add_paper(docs: list[Document], session_id: str) -> None:
 
 
 def list_papers(session_id: str) -> list[str]:
+    """Unique `metadata.title` values for the documents sidebar."""
     collection_name = get_collection_name(session_id)
     if not qdrant_client.collection_exists(collection_name):
         return []
@@ -140,7 +148,7 @@ def list_papers(session_id: str) -> list[str]:
 
 
 def delete_paper(session_id: str, title: str) -> None:
-    """Remove all chunks whose metadata.title matches."""
+    """Delete by payload filter on title — chunks, not the whole collection."""
     collection_name = get_collection_name(session_id)
     if not qdrant_client.collection_exists(collection_name):
         return
@@ -153,30 +161,55 @@ def delete_paper(session_id: str, title: str) -> None:
     _invalidate_corpus_cache(session_id)
 
 
+def _rrf_weights() -> list[float]:
+    """Chat hybrid mix; defaults match production 90% dense / 10% BM25."""
+    dense = float(os.environ.get("RRF_DENSE_WEIGHT", "0.9"))
+    bm25 = float(os.environ.get("RRF_BM25_WEIGHT", "0.1"))
+    return [dense, bm25]
+
+
 def search(
     query: str,
     session_id: str,
     k: int = 4,
     strategy: str | None = None,
 ) -> list[Document]:
-    """
-    Retrieve chunks for a session.
-
-    strategy: "dense" (default) or "hybrid" (BM25 + dense via RRF).
-    Falls back to RETRIEVAL_STRATEGY env var when strategy is None.
-    """
-    chosen = (strategy or os.environ.get("RETRIEVAL_STRATEGY", "dense")).lower().strip()
+    """Chat retrieval: hybrid RRF (0.9/0.1) then optional cross-encoder; dense is cosine-only."""
+    chosen = (strategy or os.environ.get("RETRIEVAL_STRATEGY", "hybrid")).lower().strip()
 
     if chosen == "dense":
         return get_vectorstore(session_id).similarity_search(query, k=k)
 
     if chosen == "hybrid":
-        logger.info("Retrieval strategy=hybrid session=%s top_k=%d", session_id, k)
+        weights = _rrf_weights()
+        rerank = use_cross_encoder()
+        # Same over-fetch as eval StrategyRetriever when CE is on.
+        fetch_k = max(k * 3, k + 10) if rerank else k
+        # Same inner candidate pool as evaluation.vector_index.hybrid_search.
+        candidate_k = max(fetch_k * 3, 40)
+        logger.info(
+            "Retrieval strategy=hybrid session=%s top_k=%d fetch_k=%d candidate_k=%d "
+            "rrf_dense=%.2f rrf_bm25=%.2f cross_encoder=%s",
+            session_id,
+            k,
+            fetch_k,
+            candidate_k,
+            weights[0],
+            weights[1],
+            rerank,
+        )
         store = get_vectorstore(session_id)
-        dense_docs = store.similarity_search(query, k=k * 2)
+        dense_docs = store.similarity_search(query, k=candidate_k)
         corpus = _get_session_corpus(session_id)
-        bm25_docs = bm25_retrieve(query, corpus, k=k * 2)
-        return reciprocal_rank_fusion([dense_docs, bm25_docs], k=k)
+        bm25_docs = bm25_retrieve(query, corpus, k=candidate_k)
+        fused = reciprocal_rank_fusion(
+            [dense_docs, bm25_docs],
+            k=fetch_k,
+            weights=weights,
+        )
+        if rerank:
+            return postprocess_retrieved(query, fused, top_k=k)
+        return fused[:k]
 
     logger.warning("Unknown retrieval strategy '%s'; using dense", chosen)
     return get_vectorstore(session_id).similarity_search(query, k=k)

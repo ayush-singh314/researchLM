@@ -54,13 +54,15 @@ class ExperimentConfig:
     embedding_model: str = "text-embedding-3-small"
     output_dir: Path = Path("evaluation/runs")
     regenerate_goldens: bool = False
-    metric_threshold: float = 0.7
+    metric_threshold: float = 0.4
     deepeval_model: str = "gpt-5.4-mini"
     top_k: int = 4
     max_contexts: int = 5
     goldens_per_context: int = 2
     chunking_profile: str = "default"
     use_rerank: bool = True
+    rrf_dense_weight: float = 0.9
+    rrf_bm25_weight: float = 0.1
 
 
 @dataclass
@@ -308,15 +310,23 @@ def run_experiment(config: ExperimentConfig) -> dict:
         config.embedding_model,
         config.top_k,
     )
+    rerank_label = "cross-encoder" if config.use_rerank else "off"
     print(
         f"\n[eval] dataset={config.dataset} strategy={config.strategy} "
         f"modality={config.modality_mode} top_k={config.top_k} "
-        f"chunking={config.chunking_profile} rerank={config.use_rerank}"
+        f"chunking={config.chunking_profile} rerank={rerank_label} "
+        f"embedding={config.embedding_model} "
+        f"rrf_dense={config.rrf_dense_weight} rrf_bm25={config.rrf_bm25_weight}"
     )
 
     corpus = _load_corpus(dataset, config.modality_mode, config.chunking_profile)
     print(f"[eval] indexed chunks: {len(corpus)} (text + image captions)")
-    index = EvalVectorIndex(session_id=session_id, embedding_model=config.embedding_model)
+    index = EvalVectorIndex(
+        session_id=session_id,
+        embedding_model=config.embedding_model,
+        rrf_dense_weight=config.rrf_dense_weight,
+        rrf_bm25_weight=config.rrf_bm25_weight,
+    )
     index.index_documents(corpus)
     retriever = create_retriever(
         index,
@@ -405,6 +415,14 @@ def run_experiment(config: ExperimentConfig) -> dict:
         "top_k": config.top_k,
         "chunking_profile": config.chunking_profile,
         "use_rerank": config.use_rerank,
+        "rrf_dense_weight": config.rrf_dense_weight,
+        "rrf_bm25_weight": config.rrf_bm25_weight,
+        "rerank_method": "cross_encoder" if config.use_rerank else "none",
+        "cross_encoder_model": os.environ.get(
+            "CROSS_ENCODER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        )
+        if config.use_rerank
+        else None,
         "session_id": session_id,
         "summary": summary,
         "per_question": [

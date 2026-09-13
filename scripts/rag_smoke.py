@@ -246,7 +246,7 @@ def _stage_vector_store_insert(chunks: list[Document], session_id: str) -> str:
 def _stage_retrieval(session_id: str, query: str) -> list[Document]:
     logger.info("=== Stage 5: Retrieval ===")
     logger.info("Query: %s", query)
-    docs = search(query=query, session_id=session_id, k=RETRIEVAL_K, strategy="dense")
+    docs = search(query=query, session_id=session_id, k=RETRIEVAL_K)
     logger.info("Retrieved %d chunk(s)", len(docs))
     if not docs:
         logger.error("Retrieval returned no documents")

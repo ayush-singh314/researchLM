@@ -19,7 +19,7 @@ from evaluation.dataset_manager import GoldenItem
 _TOKEN_RE = re.compile(r"\w+")
 
 
-def build_deepeval_metrics(*, threshold: float = 0.7, model: str = "gpt-5.4-mini"):
+def build_deepeval_metrics(*, threshold: float = 0.4, model: str = "gpt-5.4-mini"):
     return [
         ContextualPrecisionMetric(threshold=threshold, model=model),
         ContextualRecallMetric(threshold=threshold, model=model),

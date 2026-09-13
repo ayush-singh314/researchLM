@@ -1,8 +1,14 @@
+"""Turn a PDF, text/markdown file, or URL into LangChain Documents (text chunks + optional figure chunks).
+
+Used by `backend.api.ingest` (chat uploads) and `evaluation.experiment_runner` (eval corpus).
+PDFs: PyMuPDF pages → splitter or research chunker → optional GPT-4o captions from extracted images.
+"""
+
 import logging
 import re
 from pathlib import Path
 
-from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebBaseLoader
+from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -15,9 +21,11 @@ from backend.rag.pdf_images import (
     paper_id_from_title,
 )
 from backend.rag.chunking import chunk_research_paper_pages
+from backend.rag.web_base import load_webpage
 
 logger = logging.getLogger(__name__)
 
+# Default (chat) chunking: 200-char overlap so claims split across a window still retrieve.
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 
@@ -30,6 +38,7 @@ _md_splitter = RecursiveCharacterTextSplitter.from_language(
 
 
 def _stamp_title(docs: list[Document], title: str) -> list[Document]:
+    """Set `metadata.title` used later to list/delete papers in Qdrant."""
     for doc in docs:
         doc.metadata["title"] = title
         doc.metadata.setdefault("modality", "text")
@@ -38,7 +47,7 @@ def _stamp_title(docs: list[Document], title: str) -> list[Document]:
 
 
 def _nearby_page_context(page_texts: dict[int, str], page_number: int, max_chars: int = 500) -> str:
-    """Return explanatory text near a figure on the same page."""
+    """Grab nearby body text (skip Figure/Table labels) so the image chunk is searchable with the figure."""
     raw = page_texts.get(page_number, "").strip()
     if not raw:
         return ""
@@ -61,7 +70,7 @@ def _image_to_document(
     title: str,
     page_texts: dict[int, str] | None = None,
 ) -> Document:
-    """Build a LangChain Document for an image-caption chunk."""
+    """One retrievable chunk: caption + nearby text; `modality=image` (not the pixels)."""
     page = extracted.page_number
     linked = _nearby_page_context(page_texts or {}, page)
     if linked:
@@ -100,7 +109,7 @@ def _require_existing_pdf(file_path: str) -> str:
 
 
 def _load_pdf_image_chunks(pdf_path: str, title: str) -> list[Document]:
-    """Extract PDF figures, caption them, and return retrievable image chunks."""
+    """Extract figures, caption with GPT-4o; scanned PDFs fall back to page rasters."""
     paper_id = paper_id_from_title(title)
     try:
         extracted = extract_pdf_images(pdf_path, paper_id)
@@ -114,6 +123,7 @@ def _load_pdf_image_chunks(pdf_path: str, title: str) -> list[Document]:
         logger.warning("Could not load page text for caption context: %s", exc)
         page_texts = {}
 
+    # Little/no extractable text → treat pages as images (scanned PDF).
     text_len = sum(len((t or "").strip()) for t in page_texts.values())
     if text_len < 80:
         try:
@@ -148,6 +158,7 @@ def _load_pdf_image_chunks(pdf_path: str, title: str) -> list[Document]:
                 img.image_path,
                 exc,
             )
+            # Still index a stub so the figure page exists in the vector store.
             image_docs.append(
                 _image_to_document(
                     img,
@@ -172,6 +183,7 @@ def load_pdf(
     include_images: bool = True,
     chunking_profile: str = "default",
 ) -> list[Document]:
+    """Load a PDF: default 1000/200 chunks, or `research` section-aware; optionally append image chunks."""
     resolved_path = _require_existing_pdf(file_path)
     title = paper_title or Path(resolved_path).stem
     raw_docs = PyMuPDFLoader(resolved_path).load()
@@ -185,19 +197,15 @@ def load_pdf(
 
 
 def load_text(file_path: str) -> list[Document]:
+    """UTF-8 .txt → default character splitter."""
     docs = TextLoader(file_path, encoding="utf-8").load()
     return _stamp_title(_splitter.split_documents(docs), Path(file_path).stem)
 
 
 def load_markdown(file_path: str) -> list[Document]:
+    """Markdown-aware splitter so headings stay with their sections."""
     docs = TextLoader(file_path, encoding="utf-8").load()
     return _stamp_title(_md_splitter.split_documents(docs), Path(file_path).stem)
-
-
-def load_webpage(url: str) -> list[Document]:
-    docs = WebBaseLoader(url, requests_kwargs={"timeout": 30}).load()
-    title = (docs[0].metadata.get("title") or url) if docs else url
-    return _stamp_title(_splitter.split_documents(docs), title)
 
 
 def load_document(
@@ -206,7 +214,7 @@ def load_document(
     include_images: bool = True,
     chunking_profile: str = "default",
 ) -> list[Document]:
-    """Dispatch to the appropriate loader based on URL prefix or file extension."""
+    """Dispatch by URL scheme or file extension; eval uses `include_images=False` for text_only."""
     if source.startswith(("http://", "https://")):
         return load_webpage(source)
     ext = Path(source).suffix.lower()

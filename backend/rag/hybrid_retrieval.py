@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
@@ -27,14 +26,26 @@ def chunk_key(doc: Document) -> str:
     return doc.page_content[:500]
 
 
-def reciprocal_rank_fusion(ranked_lists: list[list[Document]], k: int = 4) -> list[Document]:
-    """Fuse multiple ranked lists with RRF and return top_k documents."""
+def reciprocal_rank_fusion(
+    ranked_lists: list[list[Document]],
+    k: int = 4,
+    weights: list[float] | None = None,
+) -> list[Document]:
+    """Fuse ranked lists with RRF. `weights` scales each list; None means equal (1.0)."""
+    if not ranked_lists:
+        return []
+    if weights is None:
+        list_weights = [1.0] * len(ranked_lists)
+    else:
+        if len(weights) != len(ranked_lists):
+            raise ValueError("RRF weights length must match the number of ranked lists")
+        list_weights = weights
     fused: dict[str, tuple[float, Document]] = {}
-    for docs in ranked_lists:
+    for list_weight, docs in zip(list_weights, ranked_lists, strict=True):
         for rank, doc in enumerate(docs):
             key = chunk_key(doc)
             prev_score, existing = fused.get(key, (0.0, doc))
-            fused[key] = (prev_score + 1.0 / (RRF_K + rank + 1), existing)
+            fused[key] = (prev_score + list_weight / (RRF_K + rank + 1), existing)
     ranked = sorted(fused.values(), key=lambda item: item[0], reverse=True)
     return [doc for _, doc in ranked[:k]]
 

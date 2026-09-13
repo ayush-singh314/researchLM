@@ -5,6 +5,7 @@ Two processes: a FastAPI API (`uvicorn main:app` from the repo root) and a Vite 
 ```text
 PDF / URL  →  paper_loader (chunk + captions)
            →  Qdrant (per-session collection)
+           →  hybrid retrieve (0.9 dense / 0.1 BM25 RRF) → MiniLM cross-encoder → top-k
            →  LangGraph researcher (retrieve / Tavily / generate)
            →  SSE chat
 
@@ -28,7 +29,7 @@ evaluate CLI →  evaluation/datasets goldens
 | `backend/llm_schemas.py` | Pydantic schemas for structured LLM output |
 | `evaluation/` | Metrics, strategies, datasets, experiment runner |
 | `scripts/evaluate.py` | Eval CLI |
-| `alembic/` | Postgres schema migrations |
+| `backend/api/models.py` | Postgres `sessions` / `notes` schema |
 
 ## Start
 

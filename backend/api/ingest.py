@@ -1,3 +1,9 @@
+"""Bridge from HTTP uploads/URLs to RAG: temp file → paper_loader → Qdrant `add_paper`.
+
+Called only from `backend.api.routers.ingest`. Does not talk to FastAPI or Postgres.
+Eval has its own path (`load_document` + `EvalVectorIndex`) and does not use this module.
+"""
+
 import os
 import tempfile
 from pathlib import Path
@@ -7,6 +13,7 @@ from backend.rag.vector_store import add_paper
 
 
 def persist_upload_bytes(filename: str, payload: bytes) -> Path:
+    """Write upload bytes to a temp file so PyMuPDF/TextLoader can open a real path."""
     suffix = Path(filename).suffix.lower() or ".bin"
     if not payload:
         raise ValueError(f"Uploaded file has no content: {filename}")
@@ -15,7 +22,7 @@ def persist_upload_bytes(filename: str, payload: bytes) -> Path:
     ) as tmp:
         tmp.write(payload)
         tmp.flush()
-        os.fsync(tmp.fileno())
+        os.fsync(tmp.fileno())  # durable on disk before loaders open the path
         saved_path = Path(tmp.name)
     resolved = saved_path.resolve()
     if not resolved.is_file():
@@ -24,6 +31,7 @@ def persist_upload_bytes(filename: str, payload: bytes) -> Path:
 
 
 def ingest_upload(session_id: str, filename: str, payload: bytes) -> str:
+    """Chunk one uploaded file and index it into `papeer_{session_id}`; always delete the temp file."""
     saved_path = persist_upload_bytes(filename, payload)
     try:
         docs = load_document(str(saved_path), paper_title=Path(filename).stem)
@@ -40,6 +48,7 @@ def ingest_upload(session_id: str, filename: str, payload: bytes) -> str:
 
 
 def ingest_urls(session_id: str, urls: list[str]) -> tuple[list[str], list[str]]:
+    """Fetch each URL independently; successes and per-URL errors are both returned."""
     added: list[str] = []
     errors: list[str] = []
     for url in urls:

@@ -18,7 +18,7 @@ from backend.rag.vector_store import qdrant_client
 EMBEDDING_DIMS: dict[str, int] = {
     "text-embedding-3-small": 1536,
     "text-embedding-3-large": 3072,
-    "text-embedding-ada-002": 1536,
+    
 }
 
 _TOKEN_RE = re.compile(r"\w+")
@@ -51,9 +51,17 @@ def _build_embeddings(model: str) -> CacheBackedEmbeddings:
 class EvalVectorIndex:
     """Per-experiment vector index with pluggable retrieval strategies."""
 
-    def __init__(self, session_id: str, embedding_model: str):
+    def __init__(
+        self,
+        session_id: str,
+        embedding_model: str,
+        rrf_dense_weight: float = 0.9,
+        rrf_bm25_weight: float = 0.1,
+    ):
         self.session_id = session_id
         self.embedding_model = embedding_model
+        self.rrf_dense_weight = rrf_dense_weight
+        self.rrf_bm25_weight = rrf_bm25_weight
         self.collection_name = f"eval_{session_id.replace('-', '_')}_{embedding_model.replace('-', '_')}"
         self._embeddings = _build_embeddings(embedding_model)
         self._dim = _embedding_dim(embedding_model)
@@ -141,9 +149,13 @@ class EvalVectorIndex:
         return [self._bm25_docs[i] for i, score in ranked[:k] if score > 0]
 
     def hybrid_search(self, query: str, k: int = 4) -> list[Document]:
-        """Reciprocal rank fusion of BM25 and dense results."""
+        """Weighted RRF of dense then BM25 (eval/production defaults 0.9 / 0.1)."""
         candidate_k = max(k * 3, 40)
         dense_docs = self.dense_search(query, k=candidate_k)
         corpus = self._bm25_docs or self._scroll_all_documents()
         bm25_docs = bm25_retrieve(query, corpus, k=candidate_k)
-        return reciprocal_rank_fusion([dense_docs, bm25_docs], k=k)
+        return reciprocal_rank_fusion(
+            [dense_docs, bm25_docs],
+            k=k,
+            weights=[self.rrf_dense_weight, self.rrf_bm25_weight],
+        )

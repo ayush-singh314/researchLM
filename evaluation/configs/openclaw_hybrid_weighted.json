@@ -1,0 +1,11 @@
+{
+  "dataset": "openclaw",
+  "strategy": "hybrid",
+  "modality_mode": "text_only",
+  "embedding_model": "text-embedding-3-small",
+  "metric_threshold": 0.4,
+  "top_k": 4,
+  "use_rerank": true,
+  "rrf_dense_weight": 0.9,
+  "rrf_bm25_weight": 0.1
+}

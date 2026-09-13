@@ -4,5 +4,6 @@
   "modality_mode": "multimodal",
   "top_k": 20,
   "chunking_profile": "research",
-  "use_rerank": true
+  "use_rerank": true,
+  "metric_threshold": 0.4
 }

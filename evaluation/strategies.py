@@ -44,11 +44,11 @@ STRATEGY_REGISTRY: dict[str, StrategyConfig] = {
     ),
     StrategyName.DENSE.value: StrategyConfig(
         name=StrategyName.DENSE,
-        description="Dense vector similarity via Qdrant (production default).",
+        description="Dense vector similarity via Qdrant.",
     ),
     StrategyName.HYBRID.value: StrategyConfig(
         name=StrategyName.HYBRID,
-        description="Reciprocal-rank fusion of BM25 and dense retrieval.",
+        description="Weighted RRF of dense (0.9) and BM25 (0.1), then cross-encoder (production).",
     ),
     StrategyName.RAG_FUSION.value: StrategyConfig(
         name=StrategyName.RAG_FUSION,

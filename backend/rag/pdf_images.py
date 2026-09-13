@@ -1,4 +1,8 @@
-"""Extract figures from PDFs with PyMuPDF for multimodal RAG indexing."""
+"""Pull figures (and scanned pages) out of PDFs with PyMuPDF for multimodal indexing.
+
+Used by `paper_loader._load_pdf_image_chunks`. Writes files under
+`documents/extracted_images/<paper_id>/`. Does not caption — that is `image_captioner`.
+"""
 
 import logging
 import re
@@ -11,22 +15,20 @@ from backend.llm_schemas import ExtractedImage
 logger = logging.getLogger(__name__)
 
 EXTRACTED_IMAGES_ROOT = Path("documents/extracted_images")
+# Skip tiny assets (icons, rules) that waste GPT-4o caption calls.
 MIN_WIDTH = 50
 MIN_HEIGHT = 50
 MIN_BYTES = 1024
 
 
 def paper_id_from_title(title: str) -> str:
-    """Build a stable filesystem-safe id from a paper title."""
+    """Filesystem-safe folder name so two papers do not overwrite each other's images."""
     slug = re.sub(r"[^\w\-]+", "_", title.strip().lower()).strip("_")
     return slug[:64] or "paper"
 
 
 def extract_pdf_images(pdf_path: str, paper_id: str) -> list[ExtractedImage]:
-    """
-    Extract embedded images from a PDF and save them under
-    documents/extracted_images/<paper_id>/.
-    """
+    """Save each embedded image (unique xref per page) that passes size filters."""
     out_dir = EXTRACTED_IMAGES_ROOT / paper_id
     out_dir.mkdir(parents=True, exist_ok=True)
     source_pdf = str(Path(pdf_path).resolve())
@@ -45,7 +47,7 @@ def extract_pdf_images(pdf_path: str, paper_id: str) -> list[ExtractedImage]:
             for img_info in page.get_images(full=True):
                 xref = img_info[0]
                 if xref in seen_xrefs:
-                    continue
+                    continue  # same image object listed twice on the page
                 seen_xrefs.add(xref)
 
                 try:
@@ -87,7 +89,7 @@ def extract_pdf_images(pdf_path: str, paper_id: str) -> list[ExtractedImage]:
 
 
 def extract_scanned_pages(pdf_path: str, paper_id: str, min_text_chars: int = 80) -> list[ExtractedImage]:
-    """Rasterize pages that have almost no extractable text (scanned / image PDFs)."""
+    """Rasterize pages with almost no text so OCR-less scans still become captionable images."""
     out_dir = EXTRACTED_IMAGES_ROOT / paper_id
     out_dir.mkdir(parents=True, exist_ok=True)
     source_pdf = str(Path(pdf_path).resolve())
@@ -122,7 +124,7 @@ def extract_scanned_pages(pdf_path: str, paper_id: str, min_text_chars: int = 80
 
 
 def page_text_map(pdf_path: str) -> dict[int, str]:
-    """Return 1-based page number -> page text for caption context."""
+    """1-based page → text, passed into the captioner as nearby context."""
     texts: dict[int, str] = {}
     doc = fitz.open(pdf_path)
     try:

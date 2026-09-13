@@ -1,4 +1,8 @@
-"""Research-paper figure captioning via direct OpenAI GPT-4o vision API."""
+"""Caption extracted PDF figures with GPT-4o vision so they can be embedded as text.
+
+Used only from `paper_loader._load_pdf_image_chunks` (chat + eval multimodal).
+Not Groq: vision needs OpenAI. Chat answers still use Groq on the caption *text*.
+"""
 
 import base64
 import logging
@@ -30,6 +34,7 @@ CAPTION_USER_PROMPT = (
 
 
 def _get_api_key() -> str:
+    """Require OPENAI_API_KEY; same key as embeddings."""
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set")
@@ -37,6 +42,7 @@ def _get_api_key() -> str:
 
 
 def _image_data_url(image_path: str) -> str:
+    """Inline the image as a data URL — GPT-4o never sees the local filesystem path."""
     path = Path(image_path)
     if not path.is_file():
         raise FileNotFoundError(f"Image path does not exist: {path.resolve()}")
@@ -48,6 +54,7 @@ def _image_data_url(image_path: str) -> str:
 
 
 def _build_user_prompt(page_number: int | None, context_text: str | None) -> str:
+    """Add page number and nearby PDF text so the model does not invent axis labels."""
     parts = [CAPTION_USER_PROMPT]
     if page_number is not None:
         parts.append(f"This figure appears on page {page_number} of a research PDF.")
@@ -60,6 +67,7 @@ def _build_user_prompt(page_number: int | None, context_text: str | None) -> str
 
 
 def _parse_response(data: dict) -> str:
+    """Normalize chat-completions content (string or text parts) to a non-empty caption."""
     try:
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
@@ -82,11 +90,7 @@ def generate_image_caption(
     page_number: int | None = None,
     context_text: str | None = None,
 ) -> str:
-    """
-    Caption a research-paper figure using OpenAI GPT-4o vision.
-
-    Uses OPENAI_API_KEY and POST https://api.openai.com/v1/chat/completions.
-    """
+    """POST vision chat completion; temperature 0.2 for stable retrieval text."""
     api_key = _get_api_key()
     prompt = _build_user_prompt(page_number, context_text)
     url = f"{OPENAI_BASE_URL}/chat/completions"

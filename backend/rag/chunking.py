@@ -1,4 +1,9 @@
-"""Section-aware chunking for research PDFs."""
+"""Section-aware chunking for research PDFs (`chunking_profile='research'`).
+
+Used from `paper_loader.load_pdf` when eval/chat asks for the research profile.
+Default chat ingest does *not* use this — it uses 1000/200 RecursiveCharacterTextSplitter.
+Larger chunks (1400) + smaller overlap (120) keep Abstract/Method/Results together.
+"""
 
 from __future__ import annotations
 
@@ -26,7 +31,7 @@ _research_splitter = RecursiveCharacterTextSplitter(
 
 
 def _split_page_into_sections(text: str) -> list[str]:
-    """Split page text on section headers while keeping figure/table lines attached."""
+    """Split one page on numbered/named headers so Method is not glued to Results."""
     if not text.strip():
         return []
     lines = text.splitlines()
@@ -56,13 +61,14 @@ def _split_page_into_sections(text: str) -> list[str]:
 
 
 def chunk_research_paper_pages(pages: list[Document]) -> list[Document]:
-    """Chunk research PDF pages with section boundaries preserved."""
+    """Per-page sections, then size-split; mark blocks that start with Figure/Table."""
     section_docs: list[Document] = []
     for page_doc in pages:
         page_num = page_doc.metadata.get("page", page_doc.metadata.get("page_number"))
         for section_text in _split_page_into_sections(page_doc.page_content):
             meta = dict(page_doc.metadata)
             meta["page_number"] = page_num
+            # Eval lexical/CE rerank can boost these when the question names a figure.
             if _FIGURE_TABLE_LINE_RE.match(section_text.strip()[:80]):
                 meta["contains_figure_ref"] = True
             section_docs.append(Document(page_content=section_text, metadata=meta))

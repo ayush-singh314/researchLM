@@ -75,9 +75,12 @@ python scripts/evaluate.py --dataset openclaw --strategy bm25 --modality text_on
 | Flag | Description |
 |------|-------------|
 | `--regenerate-goldens` | Rebuild `goldens.json` from source PDF(s) |
-| `--embedding-model` | OpenAI embedding model for dense/hybrid |
+| `--embedding-model` | OpenAI embedding model for dense/hybrid (CLI default `text-embedding-3-small`) |
+| `--metric-threshold` | DeepEval pass cutoff per metric (default **0.4**) |
+| `--rrf-dense-weight` / `--rrf-bm25-weight` | Hybrid RRF mix (default **0.9 / 0.1**, same as chat) |
 | `--output-dir` | Override JSON run output directory |
 | `--top-k` | Retrieval depth per question |
+| `--no-rerank` | Skip dedupe + cross-encoder rerank (`ms-marco-MiniLM-L-6-v2`) |
 | `--list-datasets` | Show available datasets |
 
 ## Compare strategies
@@ -112,6 +115,17 @@ The legacy root `goldens.json` is bootstrapped into `evaluation/datasets/opencla
 | `hybrid` | RRF fusion of BM25 + dense |
 | `rag_fusion` | Stub — dense fallback until multi-query expansion is added |
 
+## Embedding cache benchmark
+
+Measures **production** `CacheBackedEmbeddings` (`blake2b` keys, `LocalFileStore`) without writing to `./embedding_cache/`.
+
+```bash
+# from repo root; needs OPENAI_API_KEY
+python evaluation/embedding_cache_benchmark.py --requests 50
+```
+
+`--queries` is an alias of `--requests`. Results and method: `evaluation/reports.md`. Reports **embedding** latency only, not full RAG.
+
 ## Environment
 
 Requires the same keys as the main app:
@@ -119,6 +133,7 @@ Requires the same keys as the main app:
 - `OPENAI_API_KEY` (embeddings + DeepEval judge)
 - `GROQ_API_KEY` (answer generation during eval)
 - `QDRANT_URL`, `QDRANT_API_KEY`
+- Optional `CROSS_ENCODER_MODEL` (default `cross-encoder/ms-marco-MiniLM-L-6-v2`) for eval rerank; first run downloads weights. Chat retrieval does not use this.
 
 ## Resume bullet
 

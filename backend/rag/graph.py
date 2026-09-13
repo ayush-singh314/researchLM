@@ -23,7 +23,7 @@ from backend.rag.vector_store import search as vs_search
 
 load_dotenv()
 
-RETRIEVAL_STRATEGY = os.environ.get("RETRIEVAL_STRATEGY", "dense").lower().strip()
+RETRIEVAL_STRATEGY = os.environ.get("RETRIEVAL_STRATEGY", "hybrid").lower().strip()
 
 llm = ChatGroq(model="openai/gpt-oss-120b")
 

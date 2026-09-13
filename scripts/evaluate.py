@@ -61,7 +61,11 @@ def _print_runtime_config() -> None:
     print(f"EVAL_MAX_CONCURRENT={max_concurrent}")
     print(f"EVAL_THROTTLE_VALUE={throttle}")
     print(f"EVAL_MAX_TEST_CASES={max_cases}")
-    print(f"RETRIEVAL_STRATEGY={os.environ.get('RETRIEVAL_STRATEGY', 'dense')} (app only)")
+    print(f"RETRIEVAL_STRATEGY={os.environ.get('RETRIEVAL_STRATEGY', 'hybrid')} (app default hybrid)")
+    print(
+        "CROSS_ENCODER_MODEL="
+        f"{os.environ.get('CROSS_ENCODER_MODEL', 'cross-encoder/ms-marco-MiniLM-L-6-v2')}"
+    )
     for key in DEEPEVAL_TIMEOUT_ENV_KEYS:
         print(f"{key}={os.environ.get(key)}")
 
@@ -105,8 +109,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--metric-threshold",
         type=float,
-        default=0.7,
-        help="DeepEval pass threshold",
+        default=0.4,
+        help="DeepEval pass threshold (default 0.4)",
     )
     parser.add_argument(
         "--deepeval-model",
@@ -128,7 +132,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-rerank",
         action="store_true",
-        help="Disable post-retrieval dedupe and lexical reranking",
+        help="Disable post-retrieval dedupe and cross-encoder reranking",
+    )
+    parser.add_argument(
+        "--rrf-dense-weight",
+        type=float,
+        default=0.9,
+        help="Hybrid RRF weight for the dense list (chat + eval default 0.9)",
+    )
+    parser.add_argument(
+        "--rrf-bm25-weight",
+        type=float,
+        default=0.1,
+        help="Hybrid RRF weight for the BM25 list (chat + eval default 0.1)",
     )
     parser.add_argument(
         "--list-datasets",
@@ -171,6 +187,8 @@ def main() -> None:
         top_k=args.top_k,
         chunking_profile=args.chunking_profile,
         use_rerank=not args.no_rerank,
+        rrf_dense_weight=args.rrf_dense_weight,
+        rrf_bm25_weight=args.rrf_bm25_weight,
     )
     config = merge_config_with_dataset_defaults(config, dataset_info)
 
