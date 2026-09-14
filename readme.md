@@ -62,7 +62,7 @@ Pipeline map: [docs/architecture.md](docs/architecture.md). Interview study guid
 | App DB | Neon Postgres, SQLAlchemy, Psycopg | `sessions`, `notes` |
 | Agent memory | LangGraph `PostgresSaver` | Chat thread state (`thread_id` = session id) |
 | Vectors | Qdrant, langchain-qdrant | Per-session embeddings index |
-| Embeddings | OpenAI `text-embedding-3-small` (1536-d), `CacheBackedEmbeddings` | Index + query vectors |
+| Embeddings | OpenAI `text-embedding-3-small` (1536-d), `CacheBackedEmbeddings` + Redis Cloud | Index + query vector cache |
 | Captions | OpenAI `gpt-4o` | Image captions at ingest |
 | LLM | Groq `ChatGroq` model `openai/gpt-oss-120b` | Router, researcher, notes, session titles |
 | Web search | Tavily | Retrieve-path tool + claim verification |
@@ -72,6 +72,16 @@ Pipeline map: [docs/architecture.md](docs/architecture.md). Interview study guid
 | Evaluation | DeepEval, `scripts/evaluate.py` | Offline RAG experiments |
 
 Listed in `pyproject.toml` but **not imported on live product paths:** `chromadb`, `streamlit`, `arxiv`, `langgraph-checkpoint-sqlite`. Do not treat those as the running stack.
+
+### Embedding cache (Redis)
+
+Chat ingest (`embed_documents`) and retrieve (`embed_query`) share LangChain `CacheBackedEmbeddings` (`blake2b` keys, namespace = embedding model, `query_embedding_cache=True`). The byte store is **Redis Cloud** (`REDIS_URL`), not `./embedding_cache/`.
+
+Eviction is Redis **maxmemory + `allkeys-lru`**, configured in the Redis Cloud dashboard (and optionally attempted at startup via `REDIS_MAXMEMORY` / `REDIS_MAXMEMORY_POLICY`). There is no application-level key cap.
+
+This caches **embedding vectors only** (chunks and queries). It is **not** semantic answer caching: Groq completions, session titles, and captions are not stored in Redis.
+
+If Redis is unreachable, the API fails at startup with a clear error (no silent fallback to a file store). Evaluation still uses a separate on-disk `LocalFileStore` under `./embedding_cache/eval_<model>/`.
 
 ---
 
@@ -90,6 +100,7 @@ flowchart LR
   API --> Qdrant[(Qdrant)]
   API --> Groq[Groq LLM]
   API --> OpenAI[OpenAI embeddings and captions]
+  API --> Redis[(Redis embedding cache)]
   API --> Tavily[Tavily]
 ```
 
@@ -229,6 +240,7 @@ researchlm/
 - Python **3.12+** (`pyproject.toml` `requires-python`)
 - Node.js (Vite frontend; no `engines` field in `frontend/package.json`)
 - Qdrant (`QDRANT_URL`)
+- Redis Cloud (`REDIS_URL`) for embedding cache
 - Neon (or other) Postgres (`DATABASE_URL`)
 - Neon Auth base URL
 - API keys: OpenAI, Groq, Tavily (as used by embeddings, captions, ChatGroq, web search)
@@ -246,7 +258,7 @@ pip install -r requirements.txt
 
 copy .env.example .env          # Windows
 # cp .env.example .env          # Unix
-# fill DATABASE_URL, NEON_AUTH_URL, QDRANT_*, OPENAI_API_KEY, GROQ_API_KEY, TAVILY_API_KEY
+# fill DATABASE_URL, NEON_AUTH_URL, QDRANT_*, REDIS_URL, OPENAI_API_KEY, GROQ_API_KEY, TAVILY_API_KEY
 
 cd frontend
 copy .env.example .env          # set VITE_NEON_AUTH_URL and VITE_API_BASE_URL

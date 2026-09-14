@@ -4,7 +4,7 @@ This documents how the cache benchmark was measured and the numbers from the fir
 
 ## What was measured
 
-ResearchLM already wraps OpenAI `text-embedding-3-small` with LangChain `CacheBackedEmbeddings` (`blake2b` keys, `LocalFileStore`, `query_embedding_cache=True`) in `backend/rag/vector_store.py`. The script `evaluation/embedding_cache_benchmark.py` exercises **that same cache class**, not a toy cache.
+ResearchLM wraps OpenAI `text-embedding-3-small` with LangChain `CacheBackedEmbeddings` (`blake2b` keys, `query_embedding_cache=True`). Production chat now uses a Redis Cloud `RedisStore` (`backend/rag/vector_store.py`). The script `evaluation/embedding_cache_benchmark.py` still uses the **same cache class** on a temp `LocalFileStore` so the bench does not write to Redis.
 
 Scope is **embedding `embed_query` only**. It does not time LangGraph, Qdrant, BM25, cross-encoder rerank, or Groq generation.
 
@@ -13,7 +13,7 @@ Scope is **embedding `embed_query` only**. It does not time LangGraph, Qdrant, B
 The same input sequence is used twice (fixed seed `42`, default repeat fraction `0.4`).
 
 1. **No cache** — raw `OpenAIEmbeddings`. Every request is expected to hit the API.
-2. **With cache** — production `CacheBackedEmbeddings.from_bytes_store` on a **temporary** directory. After the run the temp cache is deleted so `./embedding_cache/` is not written.
+2. **With cache** — `CacheBackedEmbeddings.from_bytes_store` on a **temporary** directory (same blake2b / query-cache settings as production). The temp cache is deleted afterward; Redis Cloud and `./embedding_cache/` are not written.
 
 API calls are counted by wrapping `OpenAIEmbeddings.client.create` (the sync embedding HTTP call). A **cache hit** is an `embed_query` where `client.create` did not run. A **miss** is an `embed_query` where it did.
 

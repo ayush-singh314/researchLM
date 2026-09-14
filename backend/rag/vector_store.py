@@ -11,7 +11,7 @@ import os
 
 from dotenv import load_dotenv
 from langchain_classic.embeddings import CacheBackedEmbeddings
-from langchain_classic.storage import LocalFileStore
+from langchain_community.storage import RedisStore
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
@@ -30,12 +30,61 @@ _session_corpus_cache: dict[str, list[Document]] = {}
 
 EMBEDDING_DIM = 1536  # must match text-embedding-3-small or Qdrant insert fails
 
+
+def _apply_redis_eviction(client) -> None:
+    """Best-effort maxmemory + LRU. Redis Cloud often blocks CONFIG SET."""
+    policy = (os.environ.get("REDIS_MAXMEMORY_POLICY") or "allkeys-lru").strip()
+    maxmemory = (os.environ.get("REDIS_MAXMEMORY") or "").strip()
+    try:
+        if maxmemory:
+            client.config_set("maxmemory", maxmemory)
+        if policy:
+            client.config_set("maxmemory-policy", policy)
+    except Exception:
+        logger.warning(
+            "Could not CONFIG SET Redis maxmemory/policy (common on Redis Cloud). "
+            "Set the instance memory limit and eviction allkeys-lru in the Redis Cloud dashboard."
+        )
+
+
+def _embedding_byte_store() -> RedisStore:
+    """Redis Cloud byte store for CacheBackedEmbeddings. No LocalFileStore fallback."""
+    redis_url = (os.environ.get("REDIS_URL") or "").strip()
+    if not redis_url:
+        raise RuntimeError(
+            "REDIS_URL is required for the embedding cache. "
+            "Set it to your Redis Cloud connection URL (rediss://...)."
+        )
+    try:
+        import redis
+    except ImportError as exc:
+        raise RuntimeError(
+            "The redis package is required for the embedding cache."
+        ) from exc
+
+    try:
+        client = redis.Redis.from_url(
+            redis_url,
+            decode_responses=False,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+        )
+        client.ping()
+    except redis.exceptions.RedisError as exc:
+        raise RuntimeError(
+            "Could not connect to Redis for the embedding cache. "
+            "Check REDIS_URL and Redis Cloud status."
+        ) from exc
+
+    _apply_redis_eviction(client)
+    return RedisStore(client=client, ttl=None, namespace="researchlm_embed")
+
+
 base_embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-embedding_file_store = LocalFileStore("./embedding_cache/")
-# Same query twice → disk cache, not another OpenAI embed call.
+# Same query/chunk twice → Redis cache, not another OpenAI embed call.
 embeddings = CacheBackedEmbeddings.from_bytes_store(
     base_embeddings,
-    embedding_file_store,
+    _embedding_byte_store(),
     namespace=base_embeddings.model,
     query_embedding_cache=True,
     key_encoder="blake2b",

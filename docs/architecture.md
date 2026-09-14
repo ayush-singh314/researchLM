@@ -4,6 +4,7 @@ Two processes: a FastAPI API (`uvicorn main:app` from the repo root) and a Vite 
 
 ```text
 PDF / URL  →  paper_loader (chunk + captions)
+           →  OpenAI embeddings (CacheBackedEmbeddings → Redis Cloud)
            →  Qdrant (per-session collection)
            →  hybrid retrieve (0.9 dense / 0.1 BM25 RRF) → MiniLM cross-encoder → top-k
            →  LangGraph researcher (retrieve / Tavily / generate)

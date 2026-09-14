@@ -117,7 +117,7 @@ The legacy root `goldens.json` is bootstrapped into `evaluation/datasets/opencla
 
 ## Embedding cache benchmark
 
-Measures **production** `CacheBackedEmbeddings` (`blake2b` keys, `LocalFileStore`) without writing to `./embedding_cache/`.
+Measures `CacheBackedEmbeddings` (`blake2b` keys) on an isolated **temp** `LocalFileStore`. Production chat uses Redis Cloud (`REDIS_URL`); this script does not write to Redis or `./embedding_cache/`.
 
 ```bash
 # from repo root; needs OPENAI_API_KEY

@@ -1,15 +1,14 @@
 #!/usr/bin/env python
-"""Benchmark ResearchLM's LangChain CacheBackedEmbeddings (blake2b + LocalFileStore).
+"""Benchmark CacheBackedEmbeddings (blake2b) without writing to Redis Cloud.
 
-Does not change production caching. Uses a throwaway cache directory so
-./embedding_cache/ is not written.
+Uses a throwaway LocalFileStore so production Redis and ./embedding_cache/ are
+not written. Eval indexing still uses ./embedding_cache/eval_<model>/.
 
-Inspected production path (do not duplicate a fake cache):
+Inspected production path (chat):
 - Ingest: add_paper -> QdrantVectorStore.add_documents -> embeddings.embed_documents
-  (backend/rag/vector_store.py; eval: evaluation/vector_index.py)
 - Query: similarity_search -> embeddings.embed_query (query_embedding_cache=True)
 - Key: blake2b(utf-8 text) hex, prefixed with model namespace
-- Store: LocalFileStore ./embedding_cache/ (chat) or ./embedding_cache/eval_<model>/
+- Production store: Redis Cloud RedisStore (REDIS_URL)
 - Model: text-embedding-3-small
 - API: OpenAIEmbeddings -> self.client.create (langchain_openai embeddings)
 
@@ -184,7 +183,7 @@ class CountingOpenAIEmbeddings:
 
 
 def _make_cached_embedder(underlying, cache_dir: Path):
-    """Same CacheBackedEmbeddings setup as vector_store.py, isolated directory."""
+    """Same CacheBackedEmbeddings settings as production, isolated temp directory."""
     from langchain_classic.embeddings import CacheBackedEmbeddings
     from langchain_classic.storage import LocalFileStore
 
@@ -334,7 +333,7 @@ def main() -> None:
     )
     unique_n = len(set(seq))
     print(f"Model: {args.model}  requests: {len(seq)}  unique texts: {unique_n}  seed: {args.seed}")
-    print("Cache: LangChain CacheBackedEmbeddings + LocalFileStore + blake2b (same as production)")
+    print("Cache: CacheBackedEmbeddings + temp LocalFileStore + blake2b (isolated; production uses Redis)")
 
     import os
 
@@ -344,7 +343,7 @@ def main() -> None:
     print("\nRunning NO CACHE (raw OpenAIEmbeddings, every request hits the API)...")
     no_cache = run_sequence(seq, use_cache=False, model=args.model, cache_dir=None)
 
-    print("Running WITH CACHE (isolated temp LocalFileStore, production CacheBackedEmbeddings)...")
+    print("Running WITH CACHE (isolated temp LocalFileStore, same CacheBackedEmbeddings API)...")
     with tempfile.TemporaryDirectory(prefix="researchlm_embed_cache_bench_") as tmp:
         with_cache = run_sequence(
             seq,
