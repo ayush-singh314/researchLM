@@ -36,7 +36,8 @@ evaluate CLI →  evaluation/datasets goldens
 
 ```bash
 # repo root
-uvicorn main:app --reload
+python main.py
+# or: uvicorn main:app --reload --reload-dir backend --reload-exclude .venv
 cd frontend && npm run dev
 python scripts/evaluate.py --list-datasets
 ```

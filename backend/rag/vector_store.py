@@ -22,6 +22,7 @@ from backend.rag.hybrid_retrieval import bm25_retrieve, reciprocal_rank_fusion
 from backend.rag.rerank import postprocess_retrieved, use_cross_encoder
 
 load_dotenv()
+os.environ.setdefault("USER_AGENT", "ResearchLM/0.1")
 
 logger = logging.getLogger(__name__)
 
@@ -29,22 +30,6 @@ logger = logging.getLogger(__name__)
 _session_corpus_cache: dict[str, list[Document]] = {}
 
 EMBEDDING_DIM = 1536  # must match text-embedding-3-small or Qdrant insert fails
-
-
-def _apply_redis_eviction(client) -> None:
-    """Best-effort maxmemory + LRU. Redis Cloud often blocks CONFIG SET."""
-    policy = (os.environ.get("REDIS_MAXMEMORY_POLICY") or "allkeys-lru").strip()
-    maxmemory = (os.environ.get("REDIS_MAXMEMORY") or "").strip()
-    try:
-        if maxmemory:
-            client.config_set("maxmemory", maxmemory)
-        if policy:
-            client.config_set("maxmemory-policy", policy)
-    except Exception:
-        logger.warning(
-            "Could not CONFIG SET Redis maxmemory/policy (common on Redis Cloud). "
-            "Set the instance memory limit and eviction allkeys-lru in the Redis Cloud dashboard."
-        )
 
 
 def _embedding_byte_store() -> RedisStore:
@@ -76,7 +61,6 @@ def _embedding_byte_store() -> RedisStore:
             "Check REDIS_URL and Redis Cloud status."
         ) from exc
 
-    _apply_redis_eviction(client)
     return RedisStore(client=client, ttl=None, namespace="researchlm_embed")
 
 
@@ -94,6 +78,7 @@ qdrant_client = QdrantClient(
     url=os.environ["QDRANT_URL"],
     api_key=os.environ["QDRANT_API_KEY"],
     timeout=120,
+    check_compatibility=False,
 )
 
 

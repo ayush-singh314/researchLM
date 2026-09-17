@@ -28,7 +28,7 @@ if not api_key:
     sys.exit(1)
 
 print(f"Connecting to {url} ...")
-client = QdrantClient(url=url, api_key=api_key, timeout=30)
+client = QdrantClient(url=url, api_key=api_key, timeout=30, check_compatibility=False)
 
 try:
     info = client.get_collections()

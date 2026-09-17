@@ -5,7 +5,7 @@ from typing import Iterator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessageChunk, HumanMessage
 from langchain_groq import ChatGroq
 
 from backend.api import repos
@@ -47,6 +47,22 @@ def generate_session_name(first_message: str) -> str:
 
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+def _message_chunk_text(chunk) -> str:
+    """Delta text from an LLM stream chunk (not a completed AIMessage)."""
+    content = getattr(chunk, "content", None)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text") or "")
+        return "".join(parts)
+    return ""
 
 
 def _initial_rag_state(session_id: str, prompt: str) -> dict:
@@ -105,13 +121,19 @@ def chat(session_id: uuid.UUID, body: ChatIn, request: Request, db: DbSession, u
                 config,
                 stream_mode="messages",
             ):
-                if (
-                    metadata.get("langgraph_node") == "generate_answer"
-                    and hasattr(chunk, "content")
-                    and chunk.content
-                ):
-                    response_text += chunk.content
-                    yield _sse("token", {"text": chunk.content})
+                # Token deltas only. The node also returns a full AIMessage; streaming
+                # that would concatenate the answer twice in the UI.
+                if metadata.get("langgraph_node") != "generate_answer":
+                    continue
+                if not isinstance(chunk, AIMessageChunk):
+                    continue
+                delta = _message_chunk_text(chunk)
+                if not delta:
+                    continue
+                if response_text and delta == response_text:
+                    continue
+                response_text += delta
+                yield _sse("token", {"text": delta})
 
             final_values = graph.get_state(config).values
             if not (response_text or "").strip():

@@ -77,7 +77,7 @@ Listed in `pyproject.toml` but **not imported on live product paths:** `chromadb
 
 Chat ingest (`embed_documents`) and retrieve (`embed_query`) share LangChain `CacheBackedEmbeddings` (`blake2b` keys, namespace = embedding model, `query_embedding_cache=True`). The byte store is **Redis Cloud** (`REDIS_URL`), not `./embedding_cache/`.
 
-Eviction is Redis **maxmemory + `allkeys-lru`**, configured in the Redis Cloud dashboard (and optionally attempted at startup via `REDIS_MAXMEMORY` / `REDIS_MAXMEMORY_POLICY`). There is no application-level key cap.
+Eviction is Redis **maxmemory + `allkeys-lru`** in the Redis Cloud dashboard (the app does not `CONFIG SET`). There is no application-level key cap.
 
 This caches **embedding vectors only** (chunks and queries). It is **not** semantic answer caching: Groq completions, session titles, and captions are not stored in Redis.
 
@@ -271,7 +271,8 @@ Schema for `sessions` and `notes` is created at API startup (`Base.metadata.crea
 
 ```bash
 # repo root — API (docs at http://localhost:8000/docs, health GET /health)
-uvicorn main:app --reload
+python main.py
+# or: uvicorn main:app --reload --reload-dir backend --reload-exclude .venv
 
 # frontend
 cd frontend

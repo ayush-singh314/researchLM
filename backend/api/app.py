@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 load_dotenv()
+os.environ.setdefault("USER_AGENT", "ResearchLM/0.1")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
