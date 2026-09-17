@@ -25,12 +25,12 @@ def get_database_url() -> str:
 def get_psycopg_conninfo() -> str:
     """Plain postgresql:// DSN for psycopg / LangGraph (no SQLAlchemy driver).
 
-    Uses DATABASE_URL. If the pooler rejects prepared statements, set
-    DATABASE_URL_UNPOOLED to the direct Neon host and we prefer that for the
-    checkpointer only.
+    Prefer CHECKPOINT_DATABASE_URL for LangGraph's PostgresSaver. Fall back to
+    DATABASE_URL_UNPOOLED (direct Neon host) and then DATABASE_URL.
     """
     raw = (
         os.environ.get("CHECKPOINT_DATABASE_URL", "").strip()
+        or os.environ.get("DATABASE_URL_UNPOOLED", "").strip()
         or os.environ.get("DATABASE_URL", "").strip()
     )
     if not raw:
